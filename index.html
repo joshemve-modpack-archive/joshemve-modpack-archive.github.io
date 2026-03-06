@@ -818,12 +818,6 @@
     <a href="about.html">About</a>
   </nav>
   <div class="header-right">
-    <a href="admin.html" style="text-decoration:none;">
-      <div class="channel-pill" title="Admin Panel">
-        <div class="avatar">JE</div>
-        Joshemve
-      </div>
-    </a>
   </div>
 </header>
 
@@ -835,15 +829,11 @@
   <p class="hero-sub">The complete collection of modpacks from Joshemve's YouTube videos — from the earliest chaos to the latest technical masterpiece.</p>
   <div class="hero-stats">
     <div class="stat">
-      <span class="stat-num">24<span>+</span></span>
+      <span class="stat-num" id="heroPackCount">—</span>
       <span class="stat-label">Modpacks</span>
     </div>
     <div class="stat">
-      <span class="stat-num">6</span>
-      <span class="stat-label">Active Videos</span>
-    </div>
-    <div class="stat">
-      <span class="stat-num">2019</span>
+      <span class="stat-num">2026</span>
       <span class="stat-label">Est.</span>
     </div>
   </div>
@@ -1176,6 +1166,7 @@
 
     const [packs, featuredData] = await Promise.all([fetchPacks(), fetchFeaturedId()]);
     allPacks = packs;
+    document.getElementById('heroPackCount').textContent = packs.length;
     renderCards(allPacks);
     renderFeatured(allPacks, featuredData);
     renderTimeline(allPacks);
