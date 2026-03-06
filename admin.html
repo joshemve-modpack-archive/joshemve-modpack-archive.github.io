@@ -314,7 +314,7 @@
   }
   .mini-art .b { border-radius:3px; }
   .pack-name-text { font-weight:600; font-size:0.88rem; }
-  .pack-series-text { font-size:0.72rem; color:var(--text-dim); margin-top:0.1rem; }
+  .pack-video-text { font-size:0.72rem; color:var(--accent3); margin-top:0.1rem; }
 
   .pack-row-status {}
   .badge {
@@ -351,7 +351,9 @@
     font-family:'Outfit',sans-serif;
   }
   .action-btn:hover { border-color:var(--accent3); color:var(--text); }
-  .action-btn.del:hover { border-color:var(--danger); color:var(--danger); }
+  .action-btn.feat { color: var(--text-dim); }
+  .action-btn.feat:hover { border-color: #f59e0b; color: #f59e0b; }
+  .action-btn.feat-active { border-color: #f59e0b; color: #f59e0b; background: rgba(245,158,11,0.1); }
 
   /* ── ADD / EDIT FORM ── */
   #formView {}
@@ -717,15 +719,15 @@
               <label class="form-label">Pack Name *</label>
               <input class="form-input" id="fName" placeholder="e.g. Verdant Depths S3">
             </div>
-            <!-- Series -->
+            <!-- Video URL -->
             <div class="form-group">
-              <label class="form-label">Series Label</label>
-              <input class="form-input" id="fSeries" placeholder="e.g. Nature Series · S3">
+              <label class="form-label">YouTube Video URL</label>
+              <input class="form-input" id="fVideoUrl" placeholder="e.g. https://youtube.com/watch?v=...">
             </div>
             <!-- Description -->
             <div class="form-group full">
               <label class="form-label">Description *</label>
-              <textarea class="form-textarea" id="fDesc" placeholder="Brief description of the modpack and series..."></textarea>
+              <textarea class="form-textarea" id="fDesc" placeholder="Brief description of the modpack and video..."></textarea>
             </div>
             <!-- MC Version -->
             <div class="form-group">
@@ -896,11 +898,17 @@ async function apiFetch(path, opts = {}) {
 }
 
 // ── DATA ──────────────────────────────────────────────────────────────────
-let packsCache = [];
+let packsCache    = [];
+let featuredPackId = null;
 
 async function loadPacks() {
   try {
-    packsCache = await apiFetch('/packs');
+    const [packs, featuredData] = await Promise.all([
+      apiFetch('/packs'),
+      apiFetch('/settings/featured').catch(() => ({ featured_id: null }))
+    ]);
+    packsCache     = packs;
+    featuredPackId = featuredData.featured_id || null;
   } catch(e) {
     showToast('Could not load packs: ' + e.message, true);
     packsCache = [];
@@ -940,7 +948,7 @@ function renderDashboard() {
       <div style="display:flex;align-items:center;gap:0.75rem;">
         ${miniArtHTML(p)}
         <div>
-          <div style="font-size:0.88rem;font-weight:600;">${p.name}</div>
+          <div style="font-size:0.88rem;font-weight:600;">${p.name}${p.id === featuredPackId ? ' <span style="color:#f59e0b;font-size:0.8rem;">★</span>' : ''}</div>
           <div style="font-size:0.7rem;color:var(--text-dim);">MC ${p.mcVer} · ${p.year}</div>
         </div>
       </div>
@@ -961,12 +969,13 @@ function renderPackTable() {
         ${miniArtHTML(p)}
         <div>
           <div class="pack-name-text">${p.name}</div>
-          <div class="pack-series-text">${p.series || '—'}</div>
+          <div class="pack-video-text">${p.videoUrl ? '▶ Video linked' : '—'}</div>
         </div>
       </div>
       <div><span class="badge badge-${p.status}">${p.status}</span></div>
       <div class="pack-row-version">MC ${p.mcVer}<br>${p.packVer||''}${p.files?.length ? `<br><span style="color:var(--accent3);font-size:0.62rem;">📦 ${p.files.length} file${p.files.length>1?'s':''}</span>` : ''}</div>
       <div class="row-actions">
+        <button class="action-btn feat ${p.id === featuredPackId ? 'feat-active' : ''}" onclick="setFeatured(${p.id})" title="Set as featured">★</button>
         <button class="action-btn" onclick="editPack(${p.id})">Edit</button>
         <button class="action-btn del" onclick="openDeleteModal(${p.id})">✕</button>
       </div>
@@ -1110,7 +1119,7 @@ function openAddForm() {
 }
 
 function clearForm() {
-  ['fName','fSeries','fDesc','fMcVer','fPackVer','fDownloads'].forEach(id => document.getElementById(id).value = '');
+  ['fName','fVideoUrl','fDesc','fMcVer','fPackVer'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('fMods').value = '';
   document.getElementById('fYear').value = new Date().getFullYear();
   document.getElementById('fStatus').value = 'active';
@@ -1132,7 +1141,7 @@ function editPack(id) {
   document.getElementById('formEyebrow').textContent = '// Edit Pack';
   document.getElementById('formHeading').textContent = 'Edit Modpack';
   document.getElementById('fName').value     = p.name;
-  document.getElementById('fSeries').value   = p.series || '';
+  document.getElementById('fVideoUrl').value  = p.videoUrl || '';
   document.getElementById('fDesc').value     = p.desc || '';
   document.getElementById('fMcVer').value    = p.mcVer || '';
   document.getElementById('fPackVer').value  = p.packVer || '';
@@ -1164,10 +1173,9 @@ async function savePack() {
   const editId = document.getElementById('editId').value;
   const payload = {
     name, desc, mcVer,
-    series:    document.getElementById('fSeries').value.trim(),
+    videoUrl:  document.getElementById('fVideoUrl').value.trim(),
     packVer:   document.getElementById('fPackVer').value.trim(),
     mods:      parseInt(document.getElementById('fMods').value) || 0,
-    downloads: document.getElementById('fDownloads').value.trim(),
     status:    document.getElementById('fStatus').value,
     year:      parseInt(document.getElementById('fYear').value) || new Date().getFullYear(),
     tags:      [...currentTags],
@@ -1214,6 +1222,21 @@ async function savePack() {
     showToast('Error: ' + e.message, true);
   } finally {
     saveBtn.textContent = 'Save Pack →'; saveBtn.disabled = false;
+  }
+}
+
+// ── FEATURED ──────────────────────────────────────────────────────────────
+async function setFeatured(id) {
+  // Toggle off if already featured
+  const newId = featuredPackId === id ? null : id;
+  try {
+    await apiFetch('/settings/featured', { method: 'PUT', body: JSON.stringify({ featured_id: newId }) });
+    featuredPackId = newId;
+    renderPackTable();
+    renderDashboard();
+    showToast(newId ? '★ Featured pack updated!' : 'Featured pack cleared.');
+  } catch(e) {
+    showToast('Error: ' + e.message, true);
   }
 }
 
