@@ -621,7 +621,7 @@
 <!-- LOGIN -->
 <div id="loginScreen">
   <div class="login-box">
-    <div class="login-logo"><span>[</span>JOSHEMVE<span>]</span></div>
+    <div class="login-logo"><span>[</span>JOSHEMVE MODPACK ARCHIVE<span>]</span></div>
     <div class="login-sub">// Admin Access</div>
     <div class="field">
       <label>Username</label>
@@ -633,6 +633,7 @@
     </div>
     <button class="btn-login" onclick="doLogin()">Sign In →</button>
     <div class="login-error" id="loginError">Incorrect credentials. Try again.</div>
+
   </div>
 </div>
 
@@ -1145,7 +1146,6 @@ function editPack(id) {
   document.getElementById('fMcVer').value    = p.mcVer || '';
   document.getElementById('fPackVer').value  = p.packVer || '';
   document.getElementById('fMods').value     = p.mods || '';
-  document.getElementById('fDownloads').value= p.downloads || '';
   document.getElementById('fStatus').value   = p.status || 'active';
   document.getElementById('fYear').value     = p.year || '';
   currentTags = [...(p.tags||[])]; renderTags();
