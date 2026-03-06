@@ -535,14 +535,20 @@
     flex-direction: column;
   }
 
-  .card-series {
-    font-size: 0.68rem;
+  .card-video-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-decoration: none;
     margin-bottom: 0.4rem;
+    transition: opacity 0.2s;
   }
+  .card-video-link:hover { opacity: 0.75; }
 
   .card-title {
     font-family: 'Bebas Neue', sans-serif;
@@ -825,8 +831,8 @@
 <section class="hero">
   <div class="hero-grid-bg"></div>
   <div class="hero-eyebrow">Complete Modpack Archive</div>
-  <h1>Every Pack.<br><em>Every Series.</em></h1>
-  <p class="hero-sub">The complete collection of modpacks from Joshemve's YouTube series — from the earliest chaos to the latest technical masterpiece.</p>
+  <h1>Every Pack.<br><em>Every Video.</em></h1>
+  <p class="hero-sub">The complete collection of modpacks from Joshemve's YouTube videos — from the earliest chaos to the latest technical masterpiece.</p>
   <div class="hero-stats">
     <div class="stat">
       <span class="stat-num">24<span>+</span></span>
@@ -834,7 +840,7 @@
     </div>
     <div class="stat">
       <span class="stat-num">6</span>
-      <span class="stat-label">Active Series</span>
+      <span class="stat-label">Active Videos</span>
     </div>
     <div class="stat">
       <span class="stat-num">2019</span>
@@ -910,7 +916,7 @@
 
 <!-- TIMELINE -->
 <div class="timeline-strip">
-  <div class="timeline-title">// Series Timeline</div>
+  <div class="timeline-title">// Video Timeline</div>
   <div class="timeline">
     <div class="tl-item">
       <div class="tl-dot"></div>
@@ -988,6 +994,15 @@
     }
   }
 
+  async function fetchFeaturedId() {
+    try {
+      const res = await fetch(`${API}/settings/featured`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.featured_id || null;
+    } catch(e) { return null; }
+  }
+
   // ── RENDER HELPERS ────────────────────────────────────────────────────────
   function artHTML(p, size = 'small') {
     const c = p.colors || ['#333','#444','#555','#333'];
@@ -1050,7 +1065,7 @@
           <span class="status-badge ${p.status}">${p.status}</span>
         </div>
         <div class="card-body">
-          <div class="card-series">${p.series||'&nbsp;'}</div>
+          ${p.videoUrl ? `<a class="card-video-link" href="${p.videoUrl}" target="_blank">▶ Watch Video</a>` : ''}
           <div class="card-title">${p.name}</div>
           <p class="card-desc">${p.desc||''}</p>
           <div class="card-tags">${(p.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
@@ -1064,29 +1079,30 @@
     attachHoverEffects();
   }
 
-  function renderFeatured(packs) {
-    const latest = [...packs].filter(p => p.status === 'active').sort((a,b) => b.id - a.id)[0] || packs[0];
-    if (!latest) return;
+  function renderFeatured(packs, featuredId) {
+    let pick = featuredId ? packs.find(p => p.id === featuredId) : null;
+    if (!pick) pick = [...packs].filter(p => p.status === 'active').sort((a,b) => b.id - a.id)[0] || packs[0];
+    if (!pick) return;
     const banner = document.querySelector('.featured-banner');
     if (!banner) return;
-    const c = latest.colors || ['#1a472a','#2d6a4f','#40916c','#74c69d'];
+    const c = pick.colors || ['#1a472a','#2d6a4f','#40916c','#74c69d'];
     banner.querySelector('.featured-bg').style.background =
       `linear-gradient(135deg,${darken(c[0])} 0%,${darken(c[1]||c[0])} 50%,${darken(c[2]||c[0])} 100%)`;
-    banner.querySelector('.featured-art').innerHTML = artHTML(latest, 'large');
-    banner.querySelector('.featured-title').innerHTML = latest.name;
-    banner.querySelector('.featured-desc').textContent = latest.desc || '';
+    banner.querySelector('.featured-art').innerHTML = artHTML(pick, 'large');
+    banner.querySelector('.featured-title').innerHTML = pick.name;
+    banner.querySelector('.featured-desc').textContent = pick.desc || '';
     const chips = banner.querySelectorAll('.meta-chip');
-    if (chips[0]) chips[0].innerHTML = `<span class="dot"></span> MC ${latest.mcVer}`;
-    if (chips[1]) chips[1].innerHTML = `<span class="dot" style="background:var(--accent3)"></span> ${latest.mods||'?'} mods`;
+    if (chips[0]) chips[0].innerHTML = `<span class="dot"></span> MC ${pick.mcVer}`;
+    if (chips[1]) chips[1].innerHTML = `<span class="dot" style="background:var(--accent3)"></span> ${pick.mods||'?'} mods`;
     const watchBtn = banner.querySelector('.btn-ghost');
-    if (watchBtn) { watchBtn.textContent = 'Watch Video →'; watchBtn.onclick = () => window.open('https://www.youtube.com/Joshemve','_blank'); }
+    if (watchBtn) { watchBtn.textContent = 'Watch Video →'; watchBtn.onclick = () => window.open(pick.videoUrl || 'https://www.youtube.com/Joshemve','_blank'); }
     const dlBtn = banner.querySelector('.btn-primary');
     if (dlBtn) {
-      if (latest.files && latest.files.length) {
-        dlBtn.textContent = latest.files.length === 1 ? 'Download Pack' : `Download (${latest.files.length} files)`;
-        dlBtn.onclick = () => latest.files.forEach(f => {
+      if (pick.files && pick.files.length) {
+        dlBtn.textContent = pick.files.length === 1 ? 'Download Pack' : `Download (${pick.files.length} files)`;
+        dlBtn.onclick = () => pick.files.forEach(f => {
           const a = document.createElement('a');
-          a.href = `${API}/files/${latest.id}/${encodeURIComponent(f.name)}`;
+          a.href = `${API}/files/${pick.id}/${encodeURIComponent(f.name)}`;
           a.download = f.name; a.click();
         });
         dlBtn.style.opacity = '1';
@@ -1146,7 +1162,7 @@
     }
     if (activeSearch) {
       filtered = filtered.filter(p =>
-        (p.name+p.series+p.desc+(p.tags||[]).join(' ')+p.mcVer).toLowerCase().includes(activeSearch)
+        (p.name+p.desc+(p.tags||[]).join(' ')+p.mcVer).toLowerCase().includes(activeSearch)
       );
     }
     renderCards(filtered);
@@ -1158,9 +1174,10 @@
     document.getElementById('cardContainer').innerHTML =
       '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
 
-    allPacks = await fetchPacks();
+    const [packs, featuredData] = await Promise.all([fetchPacks(), fetchFeaturedId()]);
+    allPacks = packs;
     renderCards(allPacks);
-    renderFeatured(allPacks);
+    renderFeatured(allPacks, featuredData);
     renderTimeline(allPacks);
   });
 </script>
