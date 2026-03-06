@@ -602,6 +602,88 @@
   }
   .dl-icon { font-size: 0.7rem; }
 
+  /* ── DOWNLOAD PANEL ── */
+  .card-downloads-panel {
+    border-top: 1px solid var(--border);
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .dl-panel-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin-bottom: 0.15rem;
+  }
+  .dl-file-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.18s;
+    text-decoration: none;
+    gap: 0.5rem;
+  }
+  .dl-file-btn:hover {
+    border-color: var(--accent);
+    background: rgba(126,255,106,0.06);
+  }
+  .dl-file-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+  }
+  .dl-file-ext {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--accent3);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .dl-file-name {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dl-file-btn:hover .dl-file-name { color: var(--text); }
+  .dl-file-size {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .dl-arrow {
+    font-size: 0.75rem;
+    color: var(--accent);
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.18s;
+  }
+  .dl-file-btn:hover .dl-arrow { opacity: 1; }
+  .no-files-note {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 0.25rem 0;
+  }
+
   /* ── TIMELINE STRIP ── */
   .timeline-strip {
     max-width: 1400px;
@@ -895,31 +977,68 @@
 </footer>
 
 <script>
-  const DATA_KEY = 'cv_packs';
-  const DEFAULT_PACKS = [
-    { id:1, name:'Quantum Forge', series:'Tech Series · S2', desc:'Fully automated tech progression from stone tools to quantum computers. Massive factory builds and complex automation chains.', mcVer:'1.20.1', packVer:'v2.4.1', mods:240, downloads:'612K', status:'active', year:2024, tags:['Tech','Automation','Hard Mode'], colors:['#1e3a5f','#2563a8','#3b82c4','#1e3a5f'], thumb:null },
-    { id:2, name:'Arcane Nexus', series:'Magic Series · S1', desc:'Deep magic progression through Thaumcraft, Blood Magic, and Ars Nouveau. Master the arcane arts to reshape reality itself.', mcVer:'1.19.2', packVer:'v1.8.0', mods:180, downloads:'389K', status:'active', year:2023, tags:['Magic','RPG','Story'], colors:['#5b21b6','#7c3aed','#9f67ff','#4c1d95'], thumb:null },
-    { id:3, name:'Desert Survival', series:'OG Series · S1', desc:'The pack that started it all. Brutal desert survival with scarce water, sand storms, and dangerous dungeons. A classic.', mcVer:'1.16.5', packVer:'v3.2.0', mods:120, downloads:'1.2M', status:'legacy', year:2019, tags:['Survival','Hardcore','Classic'], colors:['#92400e','#b45309','#d97706','#78350f'], thumb:null },
-    { id:4, name:'Verdant Depths S3', series:'Nature Series · S3', desc:'The definitive cave & nature pack. 320+ mods, custom biomes, and deep underground progression through ancient caverns.', mcVer:'1.20.1', packVer:'v3.0.2', mods:320, downloads:'847K', status:'active', year:2025, tags:['Nature','Caves','Exploration'], colors:['#166534','#15803d','#22c55e','#14532d'], thumb:null },
-    { id:5, name:'Blood Moon SMP', series:'Collab Special', desc:'A server modpack for the whole community. Faction systems, custom events, and permanent death.', mcVer:'1.20.2', packVer:'v1.2.0', mods:160, downloads:'278K', status:'active', year:2024, tags:['SMP','PvP','Factions'], colors:['#881337','#be123c','#fb7185','#9f1239'], thumb:null },
-    { id:6, name:'Sky Kingdoms', series:'Adventure · S1', desc:'Skyblock reimagined with massive floating islands, airship travel, and inter-island warfare. A fan favourite.', mcVer:'1.16.5', packVer:'v2.1.0', mods:150, downloads:'430K', status:'legacy', year:2021, tags:['Skyblock','Airships','PvE'], colors:['#713f12','#a16207','#eab308','#854d0e'], thumb:null },
-    { id:7, name:'Silicon Grove', series:'Hybrid Series · S1', desc:'Tech meets magic in a lush overgrown world. Power machinery with mana, grow circuits on vines, automate the impossible.', mcVer:'1.20.1', packVer:'v1.0.3', mods:200, downloads:'195K', status:'active', year:2025, tags:['Hybrid','Tech','Magic'], colors:['#14532d','#4ade80','#1a3a1a','#16a34a'], thumb:null },
-  ];
+  // ── CONFIG — update this to your PythonAnywhere URL ──────────────────────
+  const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
 
-  function getPacks() {
+  // ── API HELPERS ───────────────────────────────────────────────────────────
+  let allPacks = [];
+
+  async function fetchPacks() {
     try {
-      const raw = localStorage.getItem(DATA_KEY);
-      if (!raw) { localStorage.setItem(DATA_KEY, JSON.stringify(DEFAULT_PACKS)); return DEFAULT_PACKS; }
-      return JSON.parse(raw);
-    } catch(e) { return DEFAULT_PACKS; }
+      const res = await fetch(`${API}/packs`);
+      if (!res.ok) throw new Error('API error');
+      return await res.json();
+    } catch(e) {
+      console.warn('API unavailable, using empty list', e);
+      return [];
+    }
   }
 
+  // ── RENDER HELPERS ────────────────────────────────────────────────────────
   function artHTML(p, size = 'small') {
     const c = p.colors || ['#333','#444','#555','#333'];
     const cls = size === 'large' ? 'pack-art-large' : 'card-art';
-    const blockCls = size === 'large' ? 'block' : 'block';
-    if (p.thumb) return `<img src="${p.thumb}" style="width:${size==='large'?'160px':'72px'};height:${size==='large'?'160px':'72px'};border-radius:${size==='large'?'20px':'14px'};object-fit:cover;${size==='large'?'transform:rotate(-6deg);box-shadow:0 30px 80px rgba(0,0,0,0.6);':'box-shadow:0 8px 30px rgba(0,0,0,0.5);'}position:relative;z-index:1;">`;
-    return `<div class="${cls}"><div class="${blockCls}" style="background:${c[0]}"></div><div class="${blockCls}" style="background:${c[1]}"></div><div class="${blockCls}" style="background:${c[2]}"></div><div class="${blockCls}" style="background:${c[3]}"></div></div>`;
+    if (p.thumb) {
+      const w = size === 'large' ? '160px' : '72px';
+      const r = size === 'large' ? '20px' : '14px';
+      const extra = size === 'large' ? 'transform:rotate(-6deg);box-shadow:0 30px 80px rgba(0,0,0,0.6);' : 'box-shadow:0 8px 30px rgba(0,0,0,0.5);';
+      return `<img src="${p.thumb}" style="width:${w};height:${w};border-radius:${r};object-fit:cover;${extra}position:relative;z-index:1;">`;
+    }
+    return `<div class="${cls}">
+      <div class="block" style="background:${c[0]}"></div>
+      <div class="block" style="background:${c[1]}"></div>
+      <div class="block" style="background:${c[2]}"></div>
+      <div class="block" style="background:${c[3]}"></div>
+    </div>`;
+  }
+
+  function darken(hex) {
+    try {
+      let r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      r = Math.floor(r*0.3); g = Math.floor(g*0.3); b = Math.floor(b*0.3);
+      return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    } catch(e) { return '#111'; }
+  }
+
+  function buildDownloadPanel(p) {
+    if (!p.files || !p.files.length) return '';
+    const items = p.files.map(f => {
+      const ext  = f.name.split('.').pop().toUpperCase();
+      const size = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
+      const url  = `${API}/files/${p.id}/${encodeURIComponent(f.name)}`;
+      return `<a class="dl-file-btn" href="${url}" download="${f.name}">
+        <div class="dl-file-left">
+          <span class="dl-file-ext">${ext}</span>
+          <span class="dl-file-name">${f.name}</span>
+        </div>
+        <span class="dl-file-size">${size}</span>
+        <span class="dl-arrow">↓</span>
+      </a>`;
+    }).join('');
+    return `<div class="card-downloads-panel">
+      <div class="dl-panel-label">↓ Downloads (${p.files.length})</div>
+      ${items}
+    </div>`;
   }
 
   function renderCards(packs) {
@@ -932,7 +1051,7 @@
     container.innerHTML = packs.map((p, i) => `
       <div class="card" data-tags="${p.status} ${(p.tags||[]).map(t=>t.toLowerCase()).join(' ')}" style="animation-delay:${i*0.06}s">
         <div class="card-header">
-          <div class="card-header-bg" style="background:linear-gradient(135deg, ${darken(p.colors?.[0]||'#111')} 0%, ${darken(p.colors?.[1]||'#222')} 100%);"></div>
+          <div class="card-header-bg" style="background:linear-gradient(135deg,${darken(p.colors?.[0]||'#111')} 0%,${darken(p.colors?.[1]||'#222')} 100%);"></div>
           ${artHTML(p)}
           <span class="status-badge ${p.status}">${p.status}</span>
         </div>
@@ -945,20 +1064,11 @@
             <span class="card-version">MC ${p.mcVer}${p.packVer?' · '+p.packVer:''}</span>
             <span class="card-downloads"><span class="dl-icon">↓</span> ${p.downloads||'—'}</span>
           </div>
+          ${buildDownloadPanel(p)}
         </div>
-      </div>
-    `).join('');
+      </div>`).join('');
     document.getElementById('countDisplay').textContent = `${packs.length} packs`;
     attachHoverEffects();
-  }
-
-  function darken(hex) {
-    // Make background slightly darker than the colour
-    try {
-      let r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-      r = Math.floor(r*0.3); g = Math.floor(g*0.3); b = Math.floor(b*0.3);
-      return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
-    } catch(e) { return '#111'; }
   }
 
   function renderFeatured(packs) {
@@ -967,15 +1077,31 @@
     const banner = document.querySelector('.featured-banner');
     if (!banner) return;
     const c = latest.colors || ['#1a472a','#2d6a4f','#40916c','#74c69d'];
-    banner.querySelector('.featured-bg').style.background = `linear-gradient(135deg, ${darken(c[0])} 0%, ${darken(c[1]||c[0])} 50%, ${darken(c[2]||c[0])} 100%)`;
-    const artEl = banner.querySelector('.featured-art');
-    artEl.innerHTML = artHTML(latest, 'large');
+    banner.querySelector('.featured-bg').style.background =
+      `linear-gradient(135deg,${darken(c[0])} 0%,${darken(c[1]||c[0])} 50%,${darken(c[2]||c[0])} 100%)`;
+    banner.querySelector('.featured-art').innerHTML = artHTML(latest, 'large');
     banner.querySelector('.featured-title').innerHTML = latest.name;
     banner.querySelector('.featured-desc').textContent = latest.desc || '';
-    const metaChips = banner.querySelectorAll('.meta-chip');
-    if (metaChips[0]) metaChips[0].innerHTML = `<span class="dot"></span> MC ${latest.mcVer}`;
-    if (metaChips[1]) metaChips[1].innerHTML = `<span class="dot" style="background:var(--accent3)"></span> ${latest.mods||'?'} mods`;
-    if (metaChips[2]) metaChips[2].innerHTML = `<span class="dot" style="background:var(--accent2)"></span> ${latest.downloads||'—'} downloads`;
+    const chips = banner.querySelectorAll('.meta-chip');
+    if (chips[0]) chips[0].innerHTML = `<span class="dot"></span> MC ${latest.mcVer}`;
+    if (chips[1]) chips[1].innerHTML = `<span class="dot" style="background:var(--accent3)"></span> ${latest.mods||'?'} mods`;
+    if (chips[2]) chips[2].innerHTML = `<span class="dot" style="background:var(--accent2)"></span> ${latest.downloads||'—'} downloads`;
+    const dlBtn = banner.querySelector('.btn-primary');
+    if (dlBtn) {
+      if (latest.files && latest.files.length) {
+        dlBtn.textContent = latest.files.length === 1 ? 'Download Pack' : `Download (${latest.files.length} files)`;
+        dlBtn.onclick = () => latest.files.forEach(f => {
+          const a = document.createElement('a');
+          a.href = `${API}/files/${latest.id}/${encodeURIComponent(f.name)}`;
+          a.download = f.name; a.click();
+        });
+        dlBtn.style.opacity = '1';
+      } else {
+        dlBtn.textContent = 'No Files Yet';
+        dlBtn.style.opacity = '0.4';
+        dlBtn.onclick = null;
+      }
+    }
   }
 
   function renderTimeline(packs) {
@@ -983,13 +1109,12 @@
     const latest = sorted[sorted.length-1];
     const container = document.querySelector('.timeline');
     if (!container) return;
-    container.innerHTML = sorted.map((p, i) => `
+    container.innerHTML = sorted.map(p => `
       <div class="tl-item${p.id === latest?.id ? ' current' : ''}">
         <div class="tl-dot"></div>
         <div class="tl-name">${p.name}</div>
         <div class="tl-year">${p.year}</div>
-      </div>
-    `).join('');
+      </div>`).join('');
   }
 
   function attachHoverEffects() {
@@ -1002,6 +1127,7 @@
     });
   }
 
+  // ── FILTERING ─────────────────────────────────────────────────────────────
   let activeFilter = 'all';
   let activeSearch = '';
 
@@ -1018,28 +1144,30 @@
   });
 
   function applyFilters() {
-    const packs = getPacks();
-    let filtered = packs;
+    let filtered = allPacks;
     if (activeFilter !== 'all') {
-      filtered = filtered.filter(p => {
-        const combined = (p.status + ' ' + (p.tags||[]).join(' ')).toLowerCase();
-        return combined.includes(activeFilter);
-      });
+      filtered = filtered.filter(p =>
+        (p.status + ' ' + (p.tags||[]).join(' ')).toLowerCase().includes(activeFilter)
+      );
     }
     if (activeSearch) {
-      filtered = filtered.filter(p => {
-        return (p.name+p.series+p.desc+(p.tags||[]).join(' ')+p.mcVer).toLowerCase().includes(activeSearch);
-      });
+      filtered = filtered.filter(p =>
+        (p.name+p.series+p.desc+(p.tags||[]).join(' ')+p.mcVer).toLowerCase().includes(activeSearch)
+      );
     }
     renderCards(filtered);
   }
 
-  // Init
-  window.addEventListener('DOMContentLoaded', () => {
-    const packs = getPacks();
-    renderCards(packs);
-    renderFeatured(packs);
-    renderTimeline(packs);
+  // ── INIT ──────────────────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', async () => {
+    // Show loading state
+    document.getElementById('cardContainer').innerHTML =
+      '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
+
+    allPacks = await fetchPacks();
+    renderCards(allPacks);
+    renderFeatured(allPacks);
+    renderTimeline(allPacks);
   });
 </script>
 </body>
