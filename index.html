@@ -808,9 +808,8 @@
   </div>
   <nav>
     <a href="#">Archive</a>
-    <a href="#">Videos</a>
-    <a href="#">Community</a>
-    <a href="#">About</a>
+    <a href="https://www.youtube.com/Joshemve" target="_blank">Videos</a>
+    <a href="about.html">About</a>
   </nav>
   <div class="header-right">
     <a href="admin.html" style="text-decoration:none;">
@@ -836,10 +835,6 @@
     <div class="stat">
       <span class="stat-num">6</span>
       <span class="stat-label">Active Series</span>
-    </div>
-    <div class="stat">
-      <span class="stat-num">4.2<span>M</span></span>
-      <span class="stat-label">Downloads</span>
     </div>
     <div class="stat">
       <span class="stat-num">2019</span>
@@ -893,11 +888,10 @@
       <div class="featured-meta">
         <div class="meta-chip"><span class="dot"></span> MC 1.20.1</div>
         <div class="meta-chip"><span class="dot" style="background:var(--accent3)"></span> 320 mods</div>
-        <div class="meta-chip"><span class="dot" style="background:var(--accent2)"></span> 847K downloads</div>
       </div>
       <div class="featured-actions">
         <button class="btn-primary">Download Pack</button>
-        <button class="btn-ghost">Watch Series →</button>
+        <button class="btn-ghost" onclick="window.open('https://www.youtube.com/Joshemve','_blank')">Watch Video →</button>
       </div>
     </div>
   </div>
@@ -1062,7 +1056,6 @@
           <div class="card-tags">${(p.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
           <div class="card-footer">
             <span class="card-version">MC ${p.mcVer}${p.packVer?' · '+p.packVer:''}</span>
-            <span class="card-downloads"><span class="dl-icon">↓</span> ${p.downloads||'—'}</span>
           </div>
           ${buildDownloadPanel(p)}
         </div>
@@ -1085,7 +1078,8 @@
     const chips = banner.querySelectorAll('.meta-chip');
     if (chips[0]) chips[0].innerHTML = `<span class="dot"></span> MC ${latest.mcVer}`;
     if (chips[1]) chips[1].innerHTML = `<span class="dot" style="background:var(--accent3)"></span> ${latest.mods||'?'} mods`;
-    if (chips[2]) chips[2].innerHTML = `<span class="dot" style="background:var(--accent2)"></span> ${latest.downloads||'—'} downloads`;
+    const watchBtn = banner.querySelector('.btn-ghost');
+    if (watchBtn) { watchBtn.textContent = 'Watch Video →'; watchBtn.onclick = () => window.open('https://www.youtube.com/Joshemve','_blank'); }
     const dlBtn = banner.querySelector('.btn-primary');
     if (dlBtn) {
       if (latest.files && latest.files.length) {
