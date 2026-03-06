@@ -559,6 +559,40 @@
   }
   .btn-danger:hover { background:#ff6b6b; }
 
+  /* ── FILE LIST ── */
+  .file-list { display:flex; flex-direction:column; gap:0.5rem; margin-top:0.75rem; }
+  .file-item {
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--surface3); border:1px solid var(--border2);
+    border-radius:8px; padding:0.6rem 0.85rem;
+    animation:fadeUp 0.2s ease both;
+  }
+  .file-item-left { display:flex; align-items:center; gap:0.6rem; flex:1; min-width:0; }
+  .file-ext {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:5px; padding:0.15rem 0.4rem;
+    font-family:'Space Mono',monospace; font-size:0.6rem;
+    color:var(--accent3); text-transform:uppercase; flex-shrink:0;
+  }
+  .file-name { font-size:0.82rem; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .file-size { font-size:0.68rem; color:var(--text-dim); flex-shrink:0; margin-left:0.5rem; }
+  .file-remove {
+    background:none; border:none; color:var(--text-dim);
+    cursor:pointer; font-size:1rem; line-height:1; padding:0 0.25rem;
+    transition:color 0.15s; flex-shrink:0;
+  }
+  .file-remove:hover { color:var(--danger); }
+
+  .multi-upload-zone {
+    border:2px dashed var(--border2); border-radius:10px;
+    padding:1.5rem; text-align:center; cursor:pointer;
+    transition:all 0.2s; position:relative;
+  }
+  .multi-upload-zone:hover, .multi-upload-zone.drag-over {
+    border-color:var(--accent3); background:rgba(77,184,255,0.04);
+  }
+  .multi-upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+
   /* Empty state */
   .empty-state {
     padding:4rem 2rem;
@@ -767,8 +801,18 @@
                 <img class="upload-preview" id="thumbPreview">
               </div>
             </div>
+            <!-- Pack file uploads -->
+            <div class="form-group full">
+              <label class="form-label">Pack Files (ZIP, JAR, MRPACK, etc.)</label>
+              <div class="multi-upload-zone" id="multiUploadZone">
+                <input type="file" id="packFilesInput" multiple onchange="handlePackFiles(this)">
+                <div class="upload-icon">📦</div>
+                <div class="upload-text">Drop files or click to browse</div>
+                <div class="upload-sub">ZIP · JAR · MRPACK · any format · multiple files allowed</div>
+              </div>
+              <div class="file-list" id="packFileList"></div>
+            </div>
           </div>
-          <div class="form-actions">
             <button class="btn-ghost" onclick="showView('packs', document.querySelector('.nav-item:nth-child(2)'))">Cancel</button>
             <button class="btn-primary" onclick="savePack()">Save Pack →</button>
           </div>
@@ -795,77 +839,90 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ── AUTH ──
-const ADMIN_USER = 'admin';
-const ADMIN_PASS = 'craftvault';
-const SESSION_KEY = 'cv_admin_session';
+// ── CONFIG — update to your PythonAnywhere URL ────────────────────────────
+const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
 
-function doLogin() {
+// ── AUTH ──────────────────────────────────────────────────────────────────
+let adminToken = sessionStorage.getItem('cv_token') || null;
+
+async function doLogin() {
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value;
-  if (u === ADMIN_USER && p === ADMIN_PASS) {
-    localStorage.setItem(SESSION_KEY, '1');
+  try {
+    const res = await fetch(`${API}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    adminToken = data.token;
+    sessionStorage.setItem('cv_token', adminToken);
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminPanel').style.display = 'block';
     initPanel();
-  } else {
+  } catch(e) {
     const err = document.getElementById('loginError');
+    err.textContent = e.message;
     err.style.display = 'block';
     setTimeout(() => err.style.display = 'none', 3000);
   }
 }
 
-function doLogout() {
-  localStorage.removeItem(SESSION_KEY);
+async function doLogout() {
+  try {
+    await apiFetch('/logout', { method: 'POST' });
+  } catch(_) {}
+  adminToken = null;
+  sessionStorage.removeItem('cv_token');
   location.reload();
 }
 
-// Check session on load
 window.addEventListener('DOMContentLoaded', () => {
-  if (localStorage.getItem(SESSION_KEY)) {
+  if (adminToken) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminPanel').style.display = 'block';
     initPanel();
   }
 });
 
-// ── DATA ──
-const DATA_KEY = 'cv_packs';
-
-const DEFAULT_PACKS = [
-  { id:1, name:'Quantum Forge', series:'Tech Series · S2', desc:'Fully automated tech progression from stone tools to quantum computers.', mcVer:'1.20.1', packVer:'v2.4.1', mods:240, downloads:'612K', status:'active', year:2024, tags:['Tech','Automation','Hard Mode'], colors:['#1e3a5f','#2563a8','#3b82c4','#1e3a5f'], thumb:null },
-  { id:2, name:'Arcane Nexus', series:'Magic Series · S1', desc:'Deep magic progression through Thaumcraft, Blood Magic, and Ars Nouveau.', mcVer:'1.19.2', packVer:'v1.8.0', mods:180, downloads:'389K', status:'active', year:2023, tags:['Magic','RPG','Story'], colors:['#5b21b6','#7c3aed','#9f67ff','#4c1d95'], thumb:null },
-  { id:3, name:'Desert Survival', series:'OG Series · S1', desc:'The pack that started it all. Brutal desert survival with scarce water and sand storms.', mcVer:'1.16.5', packVer:'v3.2.0', mods:120, downloads:'1.2M', status:'legacy', year:2019, tags:['Survival','Hardcore','Classic'], colors:['#92400e','#b45309','#d97706','#78350f'], thumb:null },
-  { id:4, name:'Verdant Depths S3', series:'Nature Series · S3', desc:'The definitive cave & nature pack. 320+ mods, custom biomes, deep underground progression.', mcVer:'1.20.1', packVer:'v3.0.2', mods:320, downloads:'847K', status:'active', year:2025, tags:['Nature','Caves','Exploration'], colors:['#166534','#15803d','#22c55e','#14532d'], thumb:null },
-  { id:5, name:'Blood Moon SMP', series:'Collab Special', desc:'A server modpack built for the entire community with faction systems and custom events.', mcVer:'1.20.2', packVer:'v1.2.0', mods:160, downloads:'278K', status:'active', year:2024, tags:['SMP','PvP','Factions'], colors:['#881337','#be123c','#fb7185','#9f1239'], thumb:null },
-];
-
-function getPacks() {
-  const raw = localStorage.getItem(DATA_KEY);
-  if (!raw) {
-    localStorage.setItem(DATA_KEY, JSON.stringify(DEFAULT_PACKS));
-    return DEFAULT_PACKS;
+// ── API HELPER ────────────────────────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (adminToken) headers['X-Admin-Token'] = adminToken;
+  // Don't set Content-Type for FormData (browser sets it with boundary)
+  if (opts.body instanceof FormData) delete headers['Content-Type'];
+  const res = await fetch(`${API}${path}`, { ...opts, headers });
+  if (res.status === 401) { doLogout(); throw new Error('Session expired'); }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${res.status}`);
   }
-  return JSON.parse(raw);
+  return res.status === 204 ? null : res.json();
 }
 
-function savePacks(packs) {
-  localStorage.setItem(DATA_KEY, JSON.stringify(packs));
+// ── DATA ──────────────────────────────────────────────────────────────────
+let packsCache = [];
+
+async function loadPacks() {
+  try {
+    packsCache = await apiFetch('/packs');
+  } catch(e) {
+    showToast('Could not load packs: ' + e.message, true);
+    packsCache = [];
+  }
 }
 
-function getNextId(packs) {
-  return packs.length ? Math.max(...packs.map(p => p.id)) + 1 : 1;
-}
-
-// ── PANEL INIT ──
-function initPanel() {
+// ── PANEL INIT ────────────────────────────────────────────────────────────
+async function initPanel() {
+  await loadPacks();
   renderDashboard();
   renderPackTable();
   initColorPicker();
   initTagInput();
 }
 
-// ── VIEWS ──
+// ── VIEWS ─────────────────────────────────────────────────────────────────
 function showView(name, navEl) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
@@ -873,9 +930,9 @@ function showView(name, navEl) {
   if (navEl) navEl.classList.add('active');
 }
 
-// ── DASHBOARD ──
+// ── DASHBOARD ─────────────────────────────────────────────────────────────
 function renderDashboard() {
-  const packs = getPacks();
+  const packs = packsCache;
   const active = packs.filter(p => p.status === 'active').length;
   const legacy = packs.filter(p => p.status === 'legacy').length;
   document.getElementById('dashStats').innerHTML = `
@@ -884,8 +941,7 @@ function renderDashboard() {
     <div class="stat-card"><div class="stat-card-num">${legacy}</div><div class="stat-card-label">Legacy</div></div>
     <div class="stat-card"><div class="stat-card-num">${packs.reduce((a,p)=>a+(p.mods||0),0)}<span>+</span></div><div class="stat-card-label">Total Mods</div></div>
   `;
-  const recent = [...packs].reverse().slice(0, 5);
-  document.getElementById('recentList').innerHTML = recent.map(p => `
+  document.getElementById('recentList').innerHTML = [...packs].reverse().slice(0, 5).map(p => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:0.75rem;">
         ${miniArtHTML(p)}
@@ -895,19 +951,17 @@ function renderDashboard() {
         </div>
       </div>
       <span class="badge badge-${p.status}">${p.status}</span>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-// ── PACK TABLE ──
+// ── PACK TABLE ────────────────────────────────────────────────────────────
 function renderPackTable() {
-  const packs = getPacks();
   const body = document.getElementById('packTableBody');
-  if (!packs.length) {
+  if (!packsCache.length) {
     body.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No packs yet. Add your first one!</div></div>';
     return;
   }
-  body.innerHTML = packs.map((p, i) => `
+  body.innerHTML = packsCache.map((p, i) => `
     <div class="pack-row" style="animation-delay:${i*0.05}s">
       <div class="pack-row-name">
         ${miniArtHTML(p)}
@@ -917,14 +971,13 @@ function renderPackTable() {
         </div>
       </div>
       <div><span class="badge badge-${p.status}">${p.status}</span></div>
-      <div class="pack-row-version">MC ${p.mcVer}<br>${p.packVer||''}</div>
+      <div class="pack-row-version">MC ${p.mcVer}<br>${p.packVer||''}${p.files?.length ? `<br><span style="color:var(--accent3);font-size:0.62rem;">📦 ${p.files.length} file${p.files.length>1?'s':''}</span>` : ''}</div>
       <div class="pack-row-dl">↓ ${p.downloads||'—'}</div>
       <div class="row-actions">
         <button class="action-btn" onclick="editPack(${p.id})">Edit</button>
         <button class="action-btn del" onclick="openDeleteModal(${p.id})">✕</button>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 function miniArtHTML(p) {
@@ -933,7 +986,7 @@ function miniArtHTML(p) {
   return `<div class="mini-art"><div class="b" style="background:${c[0]}"></div><div class="b" style="background:${c[1]}"></div><div class="b" style="background:${c[2]}"></div><div class="b" style="background:${c[3]}"></div></div>`;
 }
 
-// ── COLOURS ──
+// ── COLOURS ───────────────────────────────────────────────────────────────
 const PALETTE = [
   '#ef4444','#f97316','#eab308','#22c55e','#14b8a6',
   '#3b82f6','#8b5cf6','#ec4899','#f43f5e','#10b981',
@@ -945,78 +998,47 @@ let activeColorSlot = 0;
 
 function initColorPicker() {
   const row = document.getElementById('colorRow');
-  // Slot selectors
   let slotsHTML = '<div style="display:flex;gap:6px;margin-bottom:8px;">';
   for (let i = 0; i < 4; i++) {
     slotsHTML += `<div id="slot${i}" onclick="setActiveSlot(${i})" style="width:28px;height:28px;border-radius:6px;cursor:pointer;background:${selectedColors[i]};border:2px solid ${i===0?'white':'transparent'};transition:all 0.15s;"></div>`;
   }
-  slotsHTML += '</div>';
-  // Palette
-  let palHTML = '<div style="display:flex;flex-wrap:wrap;gap:5px;">';
-  PALETTE.forEach(c => {
-    palHTML += `<div class="color-swatch" style="background:${c};" onclick="pickColor('${c}')"></div>`;
-  });
-  palHTML += '</div>';
-  row.innerHTML = slotsHTML + palHTML;
+  slotsHTML += '</div><div style="display:flex;flex-wrap:wrap;gap:5px;">';
+  PALETTE.forEach(c => { slotsHTML += `<div class="color-swatch" style="background:${c};" onclick="pickColor('${c}')"></div>`; });
+  row.innerHTML = slotsHTML + '</div>';
   updateArtPreview();
 }
-
 function setActiveSlot(i) {
   activeColorSlot = i;
-  for (let j = 0; j < 4; j++) {
-    const s = document.getElementById('slot' + j);
-    if (s) s.style.borderColor = j === i ? 'white' : 'transparent';
-  }
+  for (let j=0;j<4;j++) { const s=document.getElementById('slot'+j); if(s) s.style.borderColor = j===i?'white':'transparent'; }
 }
-
 function pickColor(c) {
   selectedColors[activeColorSlot] = c;
-  const slot = document.getElementById('slot' + activeColorSlot);
+  const slot = document.getElementById('slot'+activeColorSlot);
   if (slot) slot.style.background = c;
   updateArtPreview();
-  // advance slot
   if (activeColorSlot < 3) setActiveSlot(activeColorSlot + 1);
 }
-
 function updateArtPreview() {
-  for (let i = 0; i < 4; i++) {
-    const el = document.getElementById('pb' + i);
-    if (el) el.style.background = selectedColors[i];
-  }
+  for (let i=0;i<4;i++) { const el=document.getElementById('pb'+i); if(el) el.style.background=selectedColors[i]; }
 }
 
-// ── TAG INPUT ──
+// ── TAG INPUT ─────────────────────────────────────────────────────────────
 let currentTags = [];
-
 function initTagInput() {
   const input = document.getElementById('tagInput');
   input.addEventListener('keydown', e => {
-    if ((e.key === 'Enter' || e.key === ',') && input.value.trim()) {
-      e.preventDefault();
-      addTag(input.value.trim());
-      input.value = '';
-    } else if (e.key === 'Backspace' && !input.value && currentTags.length) {
-      removeTag(currentTags.length - 1);
+    if ((e.key==='Enter'||e.key===',') && input.value.trim()) {
+      e.preventDefault(); addTag(input.value.trim()); input.value='';
+    } else if (e.key==='Backspace' && !input.value && currentTags.length) {
+      removeTag(currentTags.length-1);
     }
   });
 }
-
-function addTag(tag) {
-  if (!currentTags.includes(tag)) {
-    currentTags.push(tag);
-    renderTags();
-  }
-}
-
-function removeTag(i) {
-  currentTags.splice(i, 1);
-  renderTags();
-}
-
+function addTag(tag) { if (!currentTags.includes(tag)) { currentTags.push(tag); renderTags(); } }
+function removeTag(i) { currentTags.splice(i,1); renderTags(); }
 function renderTags() {
   const wrap = document.getElementById('tagWrap');
   const input = document.getElementById('tagInput');
-  // Remove old chips
   wrap.querySelectorAll('.tag-chip').forEach(t => t.remove());
   currentTags.forEach((tag, i) => {
     const chip = document.createElement('div');
@@ -1026,26 +1048,67 @@ function renderTags() {
   });
 }
 
-// ── THUMBNAIL ──
+// ── THUMBNAIL ─────────────────────────────────────────────────────────────
 let thumbData = null;
-
 function handleThumbUpload(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) { showToast('Image too large (max 2MB)', true); return; }
+  if (file.size > 2*1024*1024) { showToast('Image too large (max 2MB)', true); return; }
   const reader = new FileReader();
   reader.onload = e => {
     thumbData = e.target.result;
     const preview = document.getElementById('thumbPreview');
-    preview.src = thumbData;
-    preview.style.display = 'block';
+    preview.src = thumbData; preview.style.display = 'block';
     document.querySelector('.upload-icon').style.display = 'none';
     document.querySelector('.upload-text').style.display = 'none';
   };
   reader.readAsDataURL(file);
 }
 
-// ── ADD FORM ──
+// ── PACK FILES ────────────────────────────────────────────────────────────
+let packFiles    = []; // existing files from API {name, size}
+let newFileQueue = []; // File objects queued for upload
+
+function handlePackFiles(input) {
+  const files = Array.from(input.files);
+  files.forEach(f => {
+    if (f.size > 500*1024*1024) { showToast(`${f.name} too large (max 500MB)`, true); return; }
+    if (!newFileQueue.find(x => x.name === f.name)) newFileQueue.push(f);
+  });
+  input.value = '';
+  renderPackFileList();
+}
+
+function removePackFile(name, isNew) {
+  if (isNew) newFileQueue = newFileQueue.filter(f => f.name !== name);
+  else       packFiles    = packFiles.filter(f => f.name !== name);
+  renderPackFileList();
+}
+
+function renderPackFileList() {
+  const list = document.getElementById('packFileList');
+  const all = [
+    ...packFiles.map(f => ({ ...f, isNew: false })),
+    ...newFileQueue.map(f => ({ name: f.name, size: f.size, isNew: true })),
+  ];
+  if (!all.length) { list.innerHTML = ''; return; }
+  list.innerHTML = all.map(f => {
+    const ext  = f.name.split('.').pop().toUpperCase();
+    const size = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
+    const newBadge = f.isNew ? '<span style="font-size:0.6rem;color:var(--accent);margin-left:4px;">NEW</span>' : '';
+    const safeName = f.name.replace(/'/g,"\\'");
+    return `<div class="file-item">
+      <div class="file-item-left">
+        <span class="file-ext">${ext}</span>
+        <span class="file-name" title="${f.name}">${f.name}</span>${newBadge}
+        <span class="file-size">${size}</span>
+      </div>
+      <button class="file-remove" onclick="removePackFile('${safeName}', ${f.isNew})">×</button>
+    </div>`;
+  }).join('');
+}
+
+// ── ADD FORM ──────────────────────────────────────────────────────────────
 function openAddForm() {
   document.getElementById('editId').value = '';
   document.getElementById('formEyebrow').textContent = '// New Pack';
@@ -1058,101 +1121,129 @@ function clearForm() {
   document.getElementById('fMods').value = '';
   document.getElementById('fYear').value = new Date().getFullYear();
   document.getElementById('fStatus').value = 'active';
-  currentTags = [];
-  renderTags();
+  currentTags = []; renderTags();
   selectedColors = ['#1e3a5f','#2563a8','#3b82c4','#1e3a5f'];
-  thumbData = null;
+  thumbData = null; packFiles = []; newFileQueue = []; renderPackFileList();
   const preview = document.getElementById('thumbPreview');
-  preview.src = ''; preview.style.display = 'none';
-  document.querySelector('.upload-icon').style.display = 'block';
-  document.querySelector('.upload-text').style.display = 'block';
+  preview.src=''; preview.style.display='none';
+  document.querySelector('.upload-icon').style.display='block';
+  document.querySelector('.upload-text').style.display='block';
   initColorPicker();
 }
 
-// ── EDIT ──
+// ── EDIT ──────────────────────────────────────────────────────────────────
 function editPack(id) {
-  const packs = getPacks();
-  const p = packs.find(x => x.id === id);
+  const p = packsCache.find(x => x.id === id);
   if (!p) return;
   document.getElementById('editId').value = id;
   document.getElementById('formEyebrow').textContent = '// Edit Pack';
   document.getElementById('formHeading').textContent = 'Edit Modpack';
-  document.getElementById('fName').value = p.name;
-  document.getElementById('fSeries').value = p.series || '';
-  document.getElementById('fDesc').value = p.desc || '';
-  document.getElementById('fMcVer').value = p.mcVer || '';
-  document.getElementById('fPackVer').value = p.packVer || '';
-  document.getElementById('fMods').value = p.mods || '';
-  document.getElementById('fDownloads').value = p.downloads || '';
-  document.getElementById('fStatus').value = p.status || 'active';
-  document.getElementById('fYear').value = p.year || '';
-  currentTags = [...(p.tags || [])];
-  renderTags();
+  document.getElementById('fName').value     = p.name;
+  document.getElementById('fSeries').value   = p.series || '';
+  document.getElementById('fDesc').value     = p.desc || '';
+  document.getElementById('fMcVer').value    = p.mcVer || '';
+  document.getElementById('fPackVer').value  = p.packVer || '';
+  document.getElementById('fMods').value     = p.mods || '';
+  document.getElementById('fDownloads').value= p.downloads || '';
+  document.getElementById('fStatus').value   = p.status || 'active';
+  document.getElementById('fYear').value     = p.year || '';
+  currentTags = [...(p.tags||[])]; renderTags();
   selectedColors = p.colors ? [...p.colors] : ['#333','#444','#555','#333'];
   thumbData = p.thumb || null;
+  packFiles = (p.files||[]).map(f => ({...f}));
+  newFileQueue = [];
+  renderPackFileList();
   if (thumbData) {
     const preview = document.getElementById('thumbPreview');
-    preview.src = thumbData; preview.style.display = 'block';
+    preview.src = thumbData; preview.style.display='block';
   }
   initColorPicker();
   showView('add', document.querySelector('.nav-item:nth-child(3)'));
 }
 
-// ── SAVE ──
-function savePack() {
-  const name = document.getElementById('fName').value.trim();
-  const desc = document.getElementById('fDesc').value.trim();
+// ── SAVE ──────────────────────────────────────────────────────────────────
+async function savePack() {
+  const name  = document.getElementById('fName').value.trim();
+  const desc  = document.getElementById('fDesc').value.trim();
   const mcVer = document.getElementById('fMcVer').value.trim();
   if (!name || !desc || !mcVer) { showToast('Name, description and MC version are required.', true); return; }
 
-  const packs = getPacks();
   const editId = document.getElementById('editId').value;
-  const pack = {
-    id: editId ? parseInt(editId) : getNextId(packs),
-    name,
-    series: document.getElementById('fSeries').value.trim(),
-    desc,
-    mcVer,
-    packVer: document.getElementById('fPackVer').value.trim(),
-    mods: parseInt(document.getElementById('fMods').value) || 0,
+  const payload = {
+    name, desc, mcVer,
+    series:    document.getElementById('fSeries').value.trim(),
+    packVer:   document.getElementById('fPackVer').value.trim(),
+    mods:      parseInt(document.getElementById('fMods').value) || 0,
     downloads: document.getElementById('fDownloads').value.trim(),
-    status: document.getElementById('fStatus').value,
-    year: parseInt(document.getElementById('fYear').value) || new Date().getFullYear(),
-    tags: [...currentTags],
-    colors: [...selectedColors],
-    thumb: thumbData || null,
+    status:    document.getElementById('fStatus').value,
+    year:      parseInt(document.getElementById('fYear').value) || new Date().getFullYear(),
+    tags:      [...currentTags],
+    colors:    [...selectedColors],
+    thumb:     thumbData || null,
   };
 
-  if (editId) {
-    const idx = packs.findIndex(p => p.id === parseInt(editId));
-    if (idx > -1) packs[idx] = pack;
-  } else {
-    packs.push(pack);
+  const saveBtn = document.querySelector('.form-actions .btn-primary');
+  saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
+
+  try {
+    let savedPack;
+    if (editId) {
+      savedPack = await apiFetch(`/packs/${editId}`, { method:'PUT', body: JSON.stringify(payload) });
+    } else {
+      savedPack = await apiFetch('/packs', { method:'POST', body: JSON.stringify(payload) });
+    }
+
+    // Handle files to delete (existing files removed from list)
+    if (editId) {
+      const original = packsCache.find(p => p.id === parseInt(editId));
+      const origNames = (original?.files||[]).map(f => f.name);
+      const keptNames = packFiles.map(f => f.name);
+      for (const name of origNames) {
+        if (!keptNames.includes(name)) {
+          await apiFetch(`/packs/${savedPack.id}/files/${encodeURIComponent(name)}`, { method:'DELETE' });
+        }
+      }
+    }
+
+    // Upload new files
+    if (newFileQueue.length) {
+      const form = new FormData();
+      newFileQueue.forEach((f, i) => form.append(`file_${i}`, f, f.name));
+      await apiFetch(`/packs/${savedPack.id}/files`, { method:'POST', body: form });
+    }
+
+    await loadPacks();
+    renderPackTable();
+    renderDashboard();
+    showToast(editId ? '✓ Pack updated!' : '✓ Pack added!');
+    showView('packs', document.querySelector('.nav-item:nth-child(2)'));
+  } catch(e) {
+    showToast('Error: ' + e.message, true);
+  } finally {
+    saveBtn.textContent = 'Save Pack →'; saveBtn.disabled = false;
   }
-
-  savePacks(packs);
-  renderPackTable();
-  renderDashboard();
-  showToast(editId ? '✓ Pack updated!' : '✓ Pack added!');
-  showView('packs', document.querySelector('.nav-item:nth-child(2)'));
 }
 
-// ── DELETE ──
+// ── DELETE ────────────────────────────────────────────────────────────────
 let deleteTargetId = null;
-function openDeleteModal(id) { deleteTargetId = id; document.getElementById('deleteModal').classList.add('show'); }
-function closeDeleteModal() { deleteTargetId = null; document.getElementById('deleteModal').classList.remove('show'); }
-function confirmDelete() {
+function openDeleteModal(id) { deleteTargetId=id; document.getElementById('deleteModal').classList.add('show'); }
+function closeDeleteModal() { deleteTargetId=null; document.getElementById('deleteModal').classList.remove('show'); }
+async function confirmDelete() {
   if (!deleteTargetId) return;
-  const packs = getPacks().filter(p => p.id !== deleteTargetId);
-  savePacks(packs);
-  renderPackTable();
-  renderDashboard();
+  try {
+    await apiFetch(`/packs/${deleteTargetId}`, { method:'DELETE' });
+    await loadPacks();
+    renderPackTable();
+    renderDashboard();
+    showToast('Pack deleted.');
+  } catch(e) {
+    showToast('Error: ' + e.message, true);
+  }
   closeDeleteModal();
-  showToast('Pack deleted.');
 }
 
-// ── TOAST ──
-function showToast(msg, isError = false) {
+// ── TOAST ─────────────────────────────────────────────────────────────────
+function showToast(msg, isError=false) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast' + (isError ? ' error' : '');
