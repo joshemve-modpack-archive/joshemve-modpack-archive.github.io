@@ -847,16 +847,7 @@
   </div>
   <button class="filter-btn active" onclick="filterCards(this, 'all')">All</button>
   <button class="filter-btn" onclick="filterCards(this, 'active')">Active</button>
-  <button class="filter-btn" onclick="filterCards(this, 'legacy')">Legacy</button>
-  <button class="filter-btn" onclick="filterCards(this, 'tech')">Tech</button>
-  <button class="filter-btn" onclick="filterCards(this, 'magic')">Magic</button>
-  <button class="filter-btn" onclick="filterCards(this, 'adventure')">Adventure</button>
-  <select class="sort-select">
-    <option>Newest First</option>
-    <option>Oldest First</option>
-    <option>Most Downloaded</option>
-    <option>Alphabetical</option>
-  </select>
+  <div id="tagFilterBtns" style="display:contents"></div>
 </div>
 
 <!-- FEATURED -->
@@ -1119,7 +1110,23 @@
   let activeFilter = 'all';
   let activeSearch = '';
 
-  function filterCards(btn, filter) {
+  function renderTagFilters(packs) {
+    // Count tag frequency across all packs
+    const freq = {};
+    packs.forEach(p => (p.tags || []).forEach(t => {
+      const key = t.toLowerCase();
+      freq[key] = (freq[key] || 0) + 1;
+    }));
+    // Sort by frequency, take top 6
+    const top = Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([tag]) => tag);
+
+    document.getElementById('tagFilterBtns').innerHTML = top.map(tag =>
+      `<button class="filter-btn" onclick="filterCards(this, '${tag}')">${tag}</button>`
+    ).join('');
+  }
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     activeFilter = filter;
@@ -1155,6 +1162,7 @@
     const [packs, featuredData] = await Promise.all([fetchPacks(), fetchFeaturedId()]);
     allPacks = packs;
     document.getElementById('heroPackCount').textContent = packs.length;
+    renderTagFilters(packs);
     renderCards(allPacks);
     renderFeatured(allPacks, featuredData);
     renderTimeline(allPacks);
