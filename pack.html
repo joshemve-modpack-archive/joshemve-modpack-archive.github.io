@@ -48,13 +48,14 @@
       display: flex; align-items: center; gap: 2px;
     }
     .logo span.bracket { color: var(--accent); }
-    nav { display: flex; gap: 2rem; }
+    nav { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 2rem; font-size: 0.82rem; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
     nav a {
       color: var(--text-muted); text-decoration: none;
       font-size: 0.82rem; letter-spacing: 0.06em;
       text-transform: uppercase; transition: color 0.15s;
     }
     nav a:hover { color: var(--accent); }
+    nav a.active { color: var(--text); }
 
     /* ── HERO BAND ── */
     .pack-hero {
@@ -122,8 +123,10 @@
     }
     .badge-mc  { background: rgba(77,184,255,0.15); color: var(--accent3); border: 1px solid rgba(77,184,255,0.25); }
     .badge-ver { background: rgba(126,255,106,0.1);  color: var(--accent);  border: 1px solid rgba(126,255,106,0.2); }
-    .badge-status-active   { background: rgba(126,255,106,0.1); color: var(--accent);  border: 1px solid rgba(126,255,106,0.25); }
-    .badge-status-archived { background: rgba(255,107,53,0.1);  color: var(--accent2); border: 1px solid rgba(255,107,53,0.25); }
+    .badge-status-active   { background: rgba(126,255,106,0.1);  color: var(--accent);  border: 1px solid rgba(126,255,106,0.25); }
+    .badge-status-legacy   { background: rgba(255,107,53,0.1);   color: var(--accent2); border: 1px solid rgba(255,107,53,0.25); }
+    .badge-status-paused   { background: rgba(77,184,255,0.1);   color: var(--accent3); border: 1px solid rgba(77,184,255,0.25); }
+    .badge-status-archived { background: rgba(122,127,142,0.1);  color: var(--text-muted); border: 1px solid rgba(122,127,142,0.25); }
 
     /* ── MAIN LAYOUT ── */
     .pack-body {
@@ -379,11 +382,16 @@
     <span class="bracket">]</span>
   </a>
   <nav>
-    <a href="index.html">Archive</a>
+    <a href="index.html" class="active">Archive</a>
     <a href="https://www.youtube.com/Joshemve" target="_blank">Videos</a>
     <a href="about.html">About</a>
   </nav>
-  <div></div>
+  <a href="about.html" title="About" style="display:flex;align-items:center;text-decoration:none;">
+    <img src="https://yt3.googleusercontent.com/Mrc0rXZd_diIFHd8Ff02tdqI1B5e5vuU97LVwN799cQWnru9X0aQTwKjTGK-BJ0PUtzfktG6=s160-c-k-c0x00ffffff-no-rj"
+      style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border);transition:border-color 0.2s;object-fit:cover;"
+      onmouseover="this.style.borderColor='var(--accent3)'" onmouseout="this.style.borderColor='var(--border)'"
+      alt="Joshemve">
+  </a>
 </header>
 
 <div id="app"></div>
@@ -447,8 +455,8 @@
     const c0 = p.colors?.[0] || '#1e3a5f';
     const c1 = p.colors?.[1] || '#0a1628';
     const ytId = youtubeId(p.videoUrl);
-    const statusClass = p.status === 'active' ? 'badge-status-active' : 'badge-status-archived';
-    const statusLabel = p.status === 'active' ? 'Active' : 'Archived';
+    const statusMap = { active: ['badge-status-active','Active'], legacy: ['badge-status-legacy','Legacy'], paused: ['badge-status-paused','Paused'], archived: ['badge-status-archived','Archived'] };
+    const [statusClass, statusLabel] = statusMap[p.status] || ['badge-status-archived', p.status];
 
     const thumbHtml = p.thumb
       ? `<div class="pack-thumb"><img src="${p.thumb}" alt="${p.name}"></div>`
