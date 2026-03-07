@@ -63,8 +63,6 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    text-decoration: none;
-    color: var(--text);
   }
   .logo span.bracket {
     color: var(--accent);
@@ -91,7 +89,6 @@
     transition: color 0.2s;
   }
   nav a:hover { color: var(--accent); }
-  nav a.active { color: var(--text); }
 
   .header-right {
     display: flex;
@@ -688,91 +685,6 @@
     padding: 0.25rem 0;
   }
 
-  /* ── TIMELINE STRIP ── */
-  .timeline-strip {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 0 2rem 4rem;
-  }
-
-  .timeline-title {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--text-muted);
-    margin-bottom: 1.5rem;
-  }
-
-  .timeline {
-    display: flex;
-    gap: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 0.5rem;
-  }
-  .timeline::-webkit-scrollbar { display: none; }
-
-  .tl-item {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    position: relative;
-    padding: 0 1.5rem;
-  }
-  .tl-item::before {
-    content: '';
-    position: absolute;
-    top: 10px;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: var(--border);
-  }
-  .tl-item:first-child::before { left: 50%; }
-  .tl-item:last-child::before { right: 50%; }
-
-  .tl-dot {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    background: var(--bg);
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    cursor: pointer;
-  }
-  .tl-dot::after {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--text-dim);
-    transition: all 0.2s;
-  }
-  .tl-item.current .tl-dot { border-color: var(--accent); }
-  .tl-item.current .tl-dot::after { background: var(--accent); }
-
-  .tl-name {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    white-space: nowrap;
-    letter-spacing: 0.04em;
-  }
-  .tl-item.current .tl-name { color: var(--accent); }
-
-  .tl-year {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.6rem;
-    color: var(--text-dim);
-  }
 
   /* ── FOOTER ── */
   footer {
@@ -805,28 +717,22 @@
 
 <!-- HEADER -->
 <header>
-  <a href="index.html" class="logo">
+  <div class="logo">
     <span class="bracket">[</span><span class="name"><span style="font-size:1.15em;">J</span>OSHEMVE <span style="font-size:1.15em;">M</span>ODPACK <span style="font-size:1.15em;">A</span>RCHIVE</span><span class="bracket">]</span>
-  </a>
+  </div>
   <nav>
-    <a href="index.html" class="active">Archive</a>
+    <a href="#">Archive</a>
     <a href="https://www.youtube.com/Joshemve" target="_blank">Videos</a>
     <a href="about.html">About</a>
   </nav>
   <div class="header-right">
-    <a href="about.html" title="About" style="display:flex;align-items:center;text-decoration:none;">
-      <img src="https://yt3.googleusercontent.com/Mrc0rXZd_diIFHd8Ff02tdqI1B5e5vuU97LVwN799cQWnru9X0aQTwKjTGK-BJ0PUtzfktG6=s160-c-k-c0x00ffffff-no-rj"
-        style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border);transition:border-color 0.2s;object-fit:cover;"
-        onmouseover="this.style.borderColor='var(--accent3)'" onmouseout="this.style.borderColor='var(--border)'"
-        alt="Joshemve">
-    </a>
   </div>
 </header>
 
 <!-- HERO -->
 <section class="hero">
   <div class="hero-grid-bg"></div>
-  <div class="hero-eyebrow">Joshemve Modpack Archive</div>
+  <div class="hero-eyebrow">Complete Modpack Archive</div>
   <h1>Every Pack.<br><em>Every Video.</em></h1>
   <p class="hero-sub">A small (incomplete) collection of modpacks from Joshemve's YouTube videos.</p>
   <div class="hero-stats">
@@ -877,6 +783,8 @@
       </div>
     </div>
   </a>
+</div>
+
 <div class="grid-section" id="cardsGrid">
   <div class="section-header">
     <span class="section-title">// All Packs</span>
@@ -887,29 +795,15 @@
   </div><!-- /cards -->
 </div>
 
-<!-- TIMELINE -->
-
-
 <!-- FOOTER -->
 <footer>
+  <span>We are not associated with Joshemve and events</span>
   <span>JMA</span> — Joshemve Modpack Archive · modded Minecraft events
-  <br></br>
-  We are not associated with Joshemve and events
 </footer>
 
 <script>
   // ── CONFIG — update this to your PythonAnywhere URL ──────────────────────
   const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
-
-
-  // ── ANALYTICS TRACKING ───────────────────────────────────────────────────
-  function track(type, data={}) {
-    fetch(`${API}/track`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({type, page:'index', ...data})
-    }).catch(()=>{});
-  }
 
   // ── API HELPERS ───────────────────────────────────────────────────────────
   let allPacks = [];
@@ -1036,18 +930,6 @@
     document.getElementById('featuredWatchBtn').onclick = e => { e.stopPropagation(); window.open(pick.videoUrl || 'https://www.youtube.com/Joshemve','_blank'); };
   }
 
-  function renderTimeline(packs) {
-    const sorted = [...packs].sort((a,b) => a.year - b.year || a.id - b.id);
-    const latest = sorted[sorted.length-1];
-    const container = document.querySelector('.timeline');
-    if (!container) return;
-    container.innerHTML = sorted.map(p => `
-      <div class="tl-item${p.id === latest?.id ? ' current' : ''}">
-        <div class="tl-dot"></div>
-        <div class="tl-name">${p.name}</div>
-        <div class="tl-year">${p.year}</div>
-      </div>`).join('');
-  }
 
   function attachHoverEffects() {
     document.querySelectorAll('.card').forEach(card => {
@@ -1110,7 +992,6 @@
 
   // ── INIT ──────────────────────────────────────────────────────────────────
   window.addEventListener('DOMContentLoaded', async () => {
-    track('pageview');
     // Show loading state
     document.getElementById('cardContainer').innerHTML =
       '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
@@ -1121,7 +1002,6 @@
     renderTagFilters(packs);
     renderCards(allPacks);
     renderFeatured(allPacks, featuredData);
-    renderTimeline(allPacks);
   });
 </script>
 </body>
