@@ -1223,12 +1223,45 @@ async function savePack() {
       }
     }
 
-    // Upload new file to Internet Archive (may take a moment)
+    // Upload new file directly from browser → Internet Archive S3, then register in DB
     if (packFile) {
-      saveBtn.textContent = 'Uploading to Archive.org…';
-      const form = new FormData();
-      form.append('file_0', packFile, packFile.name);
-      await apiFetch(`/packs/${savedPack.id}/files`, { method: 'POST', body: form });
+      saveBtn.textContent = 'Fetching upload credentials…';
+
+      // 1. Get IA credentials + identifier from backend
+      const creds = await apiFetch(`/packs/${savedPack.id}/ia-credentials`);
+
+      // 2. Upload directly to IA's S3 endpoint from the browser
+      saveBtn.textContent = 'Uploading to Archive.org… (this may take a minute)';
+      const iaUrl = `https://s3.us.archive.org/${creds.identifier}/${encodeURIComponent(packFile.name)}`;
+      const iaRes = await fetch(iaUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization':           `LOW ${creds.access_key}:${creds.secret_key}`,
+          'x-archive-auto-make-bucket': '1',
+          'x-archive-meta-title':    `Joshemve Modpack — ${creds.pack_name}`,
+          'x-archive-meta-mediatype':'software',
+          'x-archive-meta-subject':  'minecraft modpack',
+          'x-archive-meta-collection': creds.collection,
+          'Content-Type':            packFile.type || 'application/octet-stream',
+          'Content-Length':          packFile.size,
+        },
+        body: packFile,
+      });
+      if (!iaRes.ok) {
+        const txt = await iaRes.text();
+        throw new Error(`IA upload failed (${iaRes.status}): ${txt.slice(0,200)}`);
+      }
+
+      // 3. Tell backend to record the file in the DB
+      saveBtn.textContent = 'Registering file…';
+      await apiFetch(`/packs/${savedPack.id}/files/register`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name:      packFile.name,
+          size:      packFile.size,
+          mime_type: packFile.type || 'application/octet-stream',
+        }),
+      });
     }
 
     await loadPacks();
