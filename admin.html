@@ -275,7 +275,7 @@
   }
   .pack-table-header {
     display:grid;
-    grid-template-columns: 2fr 1fr 1fr 120px;
+    grid-template-columns: 24px 2fr 1fr 1fr 120px;
     gap:1rem;
     padding:0.75rem 1.25rem;
     background:var(--surface2);
@@ -288,7 +288,7 @@
   }
   .pack-row {
     display:grid;
-    grid-template-columns: 2fr 1fr 1fr 120px;
+    grid-template-columns: 24px 2fr 1fr 1fr 120px;
     gap:1rem;
     padding:1rem 1.25rem;
     border-bottom:1px solid var(--border);
@@ -336,6 +336,23 @@
     color:var(--text-muted);
   }
   .pack-row-dl { font-size:0.82rem; color:var(--text-muted); }
+
+  .drag-handle {
+    display:flex; align-items:center; justify-content:center;
+    width:24px; color:var(--text-dim); cursor:grab; font-size:1rem;
+    flex-shrink:0; user-select:none;
+  }
+  .drag-handle:active { cursor:grabbing; }
+  .pack-row.dragging { opacity:0.4; background:var(--surface2); }
+  .pack-row.drag-over { border-top:2px solid var(--accent); }
+  .reorder-bar {
+    display:none; align-items:center; justify-content:space-between;
+    padding:0.6rem 1.25rem;
+    background:rgba(126,255,106,0.06);
+    border-bottom:1px solid rgba(126,255,106,0.2);
+    font-size:0.78rem; color:var(--accent);
+  }
+  .reorder-bar.visible { display:flex; }
 
   .row-actions { display:flex; gap:0.4rem; justify-content:flex-end; }
   .action-btn {
@@ -693,7 +710,12 @@
           <button class="btn-primary" onclick="showView('add', document.querySelector('.nav-item:nth-child(3)')); openAddForm()">+ Add Pack</button>
         </div>
         <div class="pack-table">
+          <div class="reorder-bar" id="reorderBar">
+            <span>⇅ Drag to reorder — unsaved changes</span>
+            <button class="btn-primary" style="padding:0.35rem 1rem;font-size:0.78rem;" onclick="saveOrder()">Save Order</button>
+          </div>
           <div class="pack-table-header">
+            <div></div>
             <div>Pack</div>
             <div>Status</div>
             <div>Version</div>
@@ -968,7 +990,8 @@ function renderPackTable() {
     return;
   }
   body.innerHTML = packsCache.map((p, i) => `
-    <div class="pack-row" style="animation-delay:${i*0.05}s">
+    <div class="pack-row" data-id="${p.id}" draggable="true" style="animation-delay:${i*0.05}s">
+      <div class="drag-handle" title="Drag to reorder">⠿</div>
       <div class="pack-row-name">
         ${miniArtHTML(p)}
         <div>
@@ -984,6 +1007,7 @@ function renderPackTable() {
         <button class="action-btn del" onclick="openDeleteModal(${p.id})">✕</button>
       </div>
     </div>`).join('');
+  attachDragHandlers();
 }
 
 function miniArtHTML(p) {
@@ -1254,6 +1278,55 @@ async function savePack() {
     showToast('Error: ' + e.message, true);
   } finally {
     saveBtn.textContent = 'Save Pack →'; saveBtn.disabled = false;
+  }
+}
+
+
+// ── DRAG TO REORDER ───────────────────────────────────────────────────────
+let dragSrc = null;
+
+function attachDragHandlers() {
+  document.querySelectorAll('.pack-row[draggable]').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      dragSrc = row;
+      setTimeout(() => row.classList.add('dragging'), 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      document.querySelectorAll('.pack-row').forEach(r => r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.pack-row').forEach(r => r.classList.remove('drag-over'));
+      if (row !== dragSrc) row.classList.add('drag-over');
+    });
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === row) return;
+      const body = document.getElementById('packTableBody');
+      const rows = [...body.querySelectorAll('.pack-row')];
+      const srcIdx  = rows.indexOf(dragSrc);
+      const destIdx = rows.indexOf(row);
+      if (srcIdx < destIdx) row.after(dragSrc);
+      else row.before(dragSrc);
+      row.classList.remove('drag-over');
+      document.getElementById('reorderBar').classList.add('visible');
+    });
+  });
+}
+
+async function saveOrder() {
+  const ids = [...document.querySelectorAll('.pack-row[data-id]')].map(r => parseInt(r.dataset.id));
+  try {
+    await apiFetch('/packs/reorder', { method: 'PUT', body: JSON.stringify(ids) });
+    // Update packsCache to match new order
+    packsCache = ids.map(id => packsCache.find(p => p.id === id));
+    document.getElementById('reorderBar').classList.remove('visible');
+    showToast('✓ Order saved!');
+  } catch(e) {
+    showToast('Error saving order: ' + e.message, true);
   }
 }
 
