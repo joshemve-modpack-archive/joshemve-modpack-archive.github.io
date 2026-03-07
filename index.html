@@ -612,6 +612,16 @@
   }
   .dl-icon { font-size: 0.7rem; }
 
+  .card-likes {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+  }
+  .card-likes.has-likes { color: #ff6b6b; }
+
   /* ── DOWNLOAD PANEL ── */
   .card-downloads-panel {
     border-top: 1px solid var(--border);
@@ -808,6 +818,15 @@
 
   // ── API HELPERS ───────────────────────────────────────────────────────────
   let allPacks = [];
+  let allLikes = {};
+
+  async function fetchLikes() {
+    try {
+      const res = await fetch(`${API}/likes`);
+      if (!res.ok) return {};
+      return await res.json();
+    } catch(e) { return {}; }
+  }
 
   async function fetchPacks() {
     try {
@@ -901,7 +920,10 @@
           <div class="card-tags">${(p.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
           <div class="card-footer">
             <span class="card-version">MC ${p.mcVer}${p.packVer?' · '+p.packVer:''}</span>
-            <span style="font-size:0.72rem;color:var(--accent);font-family:'Space Mono',monospace;">Details →</span>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+              ${(allLikes[p.id] || 0) > 0 ? `<span class="card-likes has-likes">♥ ${allLikes[p.id]}</span>` : ''}
+              <span style="font-size:0.72rem;color:var(--accent);font-family:'Space Mono',monospace;">Details →</span>
+            </div>
           </div>
         </div>
       </a>`).join('');
@@ -997,7 +1019,8 @@
     document.getElementById('cardContainer').innerHTML =
       '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
 
-    const [packs, featuredData] = await Promise.all([fetchPacks(), fetchFeaturedId()]);
+    const [packs, featuredData, likesData] = await Promise.all([fetchPacks(), fetchFeaturedId(), fetchLikes()]);
+    allLikes = likesData;
     allPacks = packs;
     document.getElementById('heroPackCount').textContent = packs.length;
     renderTagFilters(packs);
