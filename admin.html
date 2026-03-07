@@ -778,20 +778,14 @@
         </div>
 
         <!-- Top packs -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:1.5rem;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
           <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);">// Most Viewed Packs</div>
           <div id="analyticsTopPacks" style="padding:0.5rem 0;">
             <div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.82rem;">Loading…</div>
           </div>
         </div>
 
-        <!-- Most liked packs -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
-          <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);">// Most Liked Packs</div>
-          <div id="analyticsMostLiked" style="padding:0.5rem 0;">
-            <div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.82rem;">Loading…</div>
-          </div>
-        </div>
+
       </div>
 
       <!-- Add / Edit form -->
@@ -1363,8 +1357,7 @@ async function loadAnalytics() {
     document.getElementById('aLikes').textContent     = (data.total_likes || 0).toLocaleString();
 
     renderAnalyticsChart(data.daily, data.daily_likes || []);
-    renderTopPacks(data.top_packs);
-    renderMostLiked(data.most_liked || []);
+    renderTopPacks(data.top_packs, data.most_liked || []);
   } catch(e) {
     showToast('Failed to load analytics: ' + e.message, true);
   }
@@ -1380,47 +1373,71 @@ function renderAnalyticsChart(daily, dailyLikes) {
     days.push({ day: key, visits: v ? v.count : 0, likes: l ? l.count : 0 });
   }
 
-  const W = 700, H = 140, PAD = 8;
+  const W = 600, H = 120, PX = 4, PY = 8;
   const max = Math.max(...days.map(d => Math.max(d.visits, d.likes)), 1);
-  const xStep = (W - PAD*2) / (days.length - 1);
+  const xStep = (W - PX*2) / (days.length - 1);
 
   function pts(key) {
-    return days.map((d, i) => {
-      const x = PAD + i * xStep;
-      const y = H - PAD - ((d[key] / max) * (H - PAD*2));
-      return [x, y];
-    });
+    return days.map((d, i) => [
+      PX + i * xStep,
+      H - PY - ((d[key] / max) * (H - PY*2))
+    ]);
   }
 
-  function polyline(key, color) {
+  function buildLine(key, color) {
     const p = pts(key);
-    const d = p.map((pt, i) => (i===0?'M':'L') + pt[0].toFixed(1)+','+pt[1].toFixed(1)).join(' ');
-    // Fill area under line
-    const fillD = d + ` L${p[p.length-1][0].toFixed(1)},${H-PAD} L${p[0][0].toFixed(1)},${H-PAD} Z`;
-    return `
-      <defs>
-        <linearGradient id="grad_${key}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${color}" stop-opacity="0.18"/>
-          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <path d="${fillD}" fill="url(#grad_${key})" />
-      <path d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
-      ${pts(key).map((pt, i) => `
-        <circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="3" fill="${color}" opacity="0" class="dot">
-          <title>${days[i].day}: ${days[i][key]} ${key}</title>
-        </circle>
-      `).join('')}`;
+    const linePath = p.map((pt, i) => (i===0?'M':'L') + pt[0].toFixed(2)+','+pt[1].toFixed(2)).join(' ');
+    const fillPath = linePath + ` L${p[p.length-1][0].toFixed(2)},${H} L${p[0][0].toFixed(2)},${H} Z`;
+    // Dots rendered in a separate group WITHOUT the scaling transform
+    const dots = p.map((pt, i) =>
+      `<circle data-x="${pt[0].toFixed(2)}" data-y="${pt[1].toFixed(2)}"
+        r="3.5" fill="${color}" stroke="var(--bg)" stroke-width="1.5"
+        style="cursor:default;" opacity="0" class="chart-dot"
+        ><title>${days[i].day}\nVisits: ${days[i].visits}  Likes: ${days[i].likes}</title></circle>`
+    ).join('');
+    return { linePath, fillPath, dots, color };
   }
 
   const chart = document.getElementById('analyticsChart');
-  chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
-    style="width:100%;height:140px;overflow:visible;"
-    onmouseover="this.querySelectorAll('.dot').forEach(d=>d.setAttribute('opacity','1'))"
-    onmouseout="this.querySelectorAll('.dot').forEach(d=>d.setAttribute('opacity','0'))">
-    ${polyline('visits','#7eff6a')}
-    ${polyline('likes','#ff6b6b')}
-  </svg>`;
+  const lines = [buildLine('visits','#7eff6a'), buildLine('likes','#ff6b6b')];
+
+  chart.innerHTML = `
+    <div style="position:relative;width:100%;height:140px;">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
+        style="position:absolute;inset:0;width:100%;height:100%;">
+        <defs>
+          ${lines.map(l => `
+            <linearGradient id="grad_${l.color.replace('#','')}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${l.color}" stop-opacity="0.15"/>
+              <stop offset="100%" stop-color="${l.color}" stop-opacity="0"/>
+            </linearGradient>`).join('')}
+        </defs>
+        ${lines.map(l => `
+          <path d="${l.fillPath}" fill="url(#grad_${l.color.replace('#','')})" />
+          <path d="${l.linePath}" fill="none" stroke="${l.color}" stroke-width="1.8"
+            stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        `).join('')}
+      </svg>
+      <!-- Dots overlay: positioned absolutely so they don't distort -->
+      <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;"
+        id="chartDots"
+        onmouseover="document.querySelectorAll('.chart-dot').forEach(d=>d.setAttribute('opacity','1'))"
+        onmouseout="document.querySelectorAll('.chart-dot').forEach(d=>d.setAttribute('opacity','0'))">
+        ${lines.map(l => `<g>${l.dots}</g>`).join('')}
+      </svg>
+    </div>`;
+
+  // Position dots using percentage-based layout matching the SVG viewBox
+  requestAnimationFrame(() => {
+    const container = chart.querySelector('#chartDots');
+    const rect = container.getBoundingClientRect();
+    container.querySelectorAll('.chart-dot').forEach(dot => {
+      const px = parseFloat(dot.dataset.x) / W * rect.width;
+      const py = parseFloat(dot.dataset.y) / H * rect.height;
+      dot.setAttribute('cx', px);
+      dot.setAttribute('cy', py);
+    });
+  });
 
   const labels = document.getElementById('analyticsChartLabels');
   labels.innerHTML = days.map((d, i) => {
@@ -1429,37 +1446,42 @@ function renderAnalyticsChart(daily, dailyLikes) {
   }).join('');
 }
 
-function renderTopPacks(packs) {
+function renderTopPacks(packs, mostLiked) {
   const el = document.getElementById('analyticsTopPacks');
   if (!packs.length) {
     el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.82rem;">No pack views recorded yet.</div>';
     return;
   }
-  const max = packs[0].views;
-  el.innerHTML = packs.map((p, i) => `
-    <div class="top-pack-row">
-      <span class="top-pack-rank">#${i+1}</span>
-      <span class="top-pack-name">${p.name}</span>
-      <div class="top-pack-bar-wrap"><div class="top-pack-bar" style="width:${(p.views/max*100).toFixed(1)}%"></div></div>
-      <span class="top-pack-count">${p.views}</span>
-    </div>`).join('');
+  // Build likes lookup by pack_id
+  const likesMap = {};
+  (mostLiked||[]).forEach(l => { likesMap[l.pack_id] = l.likes; });
+
+  const maxViews = packs[0].views;
+  const maxLikes = Math.max(...packs.map(p => likesMap[p.pack_id]||0), 1);
+
+  el.innerHTML = packs.map((p, i) => {
+    const likes = likesMap[p.pack_id] || 0;
+    return `
+    <div class="top-pack-row" style="flex-direction:column;align-items:stretch;gap:0.3rem;padding:0.6rem 1.25rem;">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <span class="top-pack-rank">#${i+1}</span>
+        <span class="top-pack-name">${p.name}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.6rem;padding-left:2.2rem;">
+        <span style="font-size:0.65rem;font-family:'Space Mono',monospace;color:var(--text-dim);width:3.5rem;">Views</span>
+        <div class="top-pack-bar-wrap" style="flex:1;"><div class="top-pack-bar" style="width:${(p.views/maxViews*100).toFixed(1)}%"></div></div>
+        <span class="top-pack-count">${p.views}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.6rem;padding-left:2.2rem;">
+        <span style="font-size:0.65rem;font-family:'Space Mono',monospace;color:var(--text-dim);width:3.5rem;">Likes</span>
+        <div class="top-pack-bar-wrap" style="flex:1;"><div class="top-pack-bar" style="width:${likes>0?(likes/maxLikes*100).toFixed(1):0}%;background:#ff6b6b;"></div></div>
+        <span class="top-pack-count" style="color:${likes>0?'#ff6b6b':'var(--text-dim)'};">${likes > 0 ? '♥ '+likes : '—'}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function renderMostLiked(packs) {
-  const el = document.getElementById('analyticsMostLiked');
-  if (!packs.length) {
-    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.82rem;">No likes recorded yet.</div>';
-    return;
-  }
-  const max = packs[0].likes;
-  el.innerHTML = packs.map((p, i) => `
-    <div class="top-pack-row">
-      <span class="top-pack-rank">#${i+1}</span>
-      <span class="top-pack-name">${p.name}</span>
-      <div class="top-pack-bar-wrap"><div class="top-pack-bar" style="width:${(p.likes/max*100).toFixed(1)}%;background:#ff6b6b;"></div></div>
-      <span class="top-pack-count" style="color:#ff6b6b;">♥ ${p.likes}</span>
-    </div>`).join('');
-}
+
 
 // ── DRAG TO REORDER ───────────────────────────────────────────────────────
 let dragSrc = null;
