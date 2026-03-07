@@ -685,91 +685,6 @@
     padding: 0.25rem 0;
   }
 
-  /* ── TIMELINE STRIP ── */
-  .timeline-strip {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 0 2rem 4rem;
-  }
-
-  .timeline-title {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--text-muted);
-    margin-bottom: 1.5rem;
-  }
-
-  .timeline {
-    display: flex;
-    gap: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 0.5rem;
-  }
-  .timeline::-webkit-scrollbar { display: none; }
-
-  .tl-item {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    position: relative;
-    padding: 0 1.5rem;
-  }
-  .tl-item::before {
-    content: '';
-    position: absolute;
-    top: 10px;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: var(--border);
-  }
-  .tl-item:first-child::before { left: 50%; }
-  .tl-item:last-child::before { right: 50%; }
-
-  .tl-dot {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    background: var(--bg);
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    cursor: pointer;
-  }
-  .tl-dot::after {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--text-dim);
-    transition: all 0.2s;
-  }
-  .tl-item.current .tl-dot { border-color: var(--accent); }
-  .tl-item.current .tl-dot::after { background: var(--accent); }
-
-  .tl-name {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    white-space: nowrap;
-    letter-spacing: 0.04em;
-  }
-  .tl-item.current .tl-name { color: var(--accent); }
-
-  .tl-year {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.6rem;
-    color: var(--text-dim);
-  }
 
   /* ── FOOTER ── */
   footer {
@@ -878,66 +793,10 @@
   </div><!-- /cards -->
 </div>
 
-<!-- TIMELINE -->
-<div class="timeline-strip">
-  <div class="timeline-title">// Video Timeline</div>
-  <div class="timeline">
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Desert Survival</div>
-      <div class="tl-year">2019</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Sky Kingdoms</div>
-      <div class="tl-year">2021</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Quantum Forge S1</div>
-      <div class="tl-year">2022</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Verdant Depths S1</div>
-      <div class="tl-year">2022</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Arcane Nexus</div>
-      <div class="tl-year">2023</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Verdant Depths S2</div>
-      <div class="tl-year">2023</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Quantum Forge S2</div>
-      <div class="tl-year">2024</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Blood Moon SMP</div>
-      <div class="tl-year">2024</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Silicon Grove</div>
-      <div class="tl-year">2025</div>
-    </div>
-    <div class="tl-item current">
-      <div class="tl-dot"></div>
-      <div class="tl-name">Verdant Depths S3</div>
-      <div class="tl-year">2025</div>
-    </div>
-  </div>
-</div>
 
 <!-- FOOTER -->
 <footer>
-  <span>We are not associated with Joshemve and events</span>
+  We are not associated with Joshemve and events
   <span>JMA</span> — Joshemve Modpack Archive · modded Minecraft events
 </footer>
 
@@ -1070,18 +929,6 @@
     document.getElementById('featuredWatchBtn').onclick = e => { e.stopPropagation(); window.open(pick.videoUrl || 'https://www.youtube.com/Joshemve','_blank'); };
   }
 
-  function renderTimeline(packs) {
-    const sorted = [...packs].sort((a,b) => a.year - b.year || a.id - b.id);
-    const latest = sorted[sorted.length-1];
-    const container = document.querySelector('.timeline');
-    if (!container) return;
-    container.innerHTML = sorted.map(p => `
-      <div class="tl-item${p.id === latest?.id ? ' current' : ''}">
-        <div class="tl-dot"></div>
-        <div class="tl-name">${p.name}</div>
-        <div class="tl-year">${p.year}</div>
-      </div>`).join('');
-  }
 
   function attachHoverEffects() {
     document.querySelectorAll('.card').forEach(card => {
@@ -1154,7 +1001,6 @@
     renderTagFilters(packs);
     renderCards(allPacks);
     renderFeatured(allPacks, featuredData);
-    renderTimeline(allPacks);
   });
 </script>
 </body>
