@@ -833,7 +833,7 @@
       <span class="stat-label">Modpacks</span>
     </div>
     <div class="stat">
-      <span class="stat-num">2026</span>
+      <span class="stat-num">2019</span>
       <span class="stat-label">Est.</span>
     </div>
   </div>
@@ -1024,8 +1024,7 @@
     const items = p.files.map(f => {
       const ext  = f.name.split('.').pop().toUpperCase();
       const size = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
-      const url  = `${API}/files/${p.id}/${encodeURIComponent(f.name)}`;
-      return `<a class="dl-file-btn" href="${url}" download="${f.name}">
+      return `<a class="dl-file-btn" href="${f.url}" target="_blank" rel="noopener">
         <div class="dl-file-left">
           <span class="dl-file-ext">${ext}</span>
           <span class="dl-file-name">${f.name}</span>
@@ -1090,11 +1089,7 @@
     if (dlBtn) {
       if (pick.files && pick.files.length) {
         dlBtn.textContent = pick.files.length === 1 ? 'Download Pack' : `Download (${pick.files.length} files)`;
-        dlBtn.onclick = () => pick.files.forEach(f => {
-          const a = document.createElement('a');
-          a.href = `${API}/files/${pick.id}/${encodeURIComponent(f.name)}`;
-          a.download = f.name; a.click();
-        });
+        dlBtn.onclick = () => pick.files.forEach(f => window.open(f.url, '_blank'));
         dlBtn.style.opacity = '1';
       } else {
         dlBtn.textContent = 'No Files Yet';
