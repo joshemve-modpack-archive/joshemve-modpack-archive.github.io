@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Joshemve — About</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<title>JMA - About</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0a0c0f;
@@ -18,124 +18,174 @@
     --text-muted: #7a7f8e;
     --text-dim: #4a4f5e;
   }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif; min-height:100vh; }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
 
   body::before {
-    content:'';
-    position:fixed; inset:0;
-    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events:none; z-index:1000; opacity:0.4;
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
   }
 
   /* ── HEADER ── */
   header {
-    position:sticky; top:0; z-index:100;
-    background:rgba(10,12,15,0.85);
-    backdrop-filter:blur(20px);
-    border-bottom:1px solid var(--border);
-    padding:0 2rem;
-    display:flex; align-items:center; justify-content:space-between;
-    height:64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,12,15,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
   }
-  .logo {
-    font-family:'Bebas Neue',sans-serif; font-size:1.8rem;
-    letter-spacing:0.08em; text-decoration:none; color:var(--text);
-  }
-  .logo span { color:var(--accent); }
-  nav { display:flex; gap:2rem; font-size:0.82rem; font-weight:500; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-muted); }
-  nav a { text-decoration:none; color:inherit; transition:color 0.2s; }
-  nav a:hover { color:var(--accent); }
-  nav a.active { color:var(--text); }
 
-  /* ── CONTENT ── */
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .logo span.bracket { color: var(--accent); }
+  .logo span.name    { color: var(--text); }
+
+  nav {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 2rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  nav a { text-decoration: none; color: inherit; transition: color 0.2s; }
+  nav a:hover  { color: var(--accent); }
+  nav a.active { color: var(--text); }
+
+  /* ── PAGE ── */
   .page {
-    max-width:720px;
-    margin:0 auto;
-    padding:5rem 2rem 6rem;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 5rem 2rem 6rem;
   }
 
   .eyebrow {
-    font-family:'Space Mono',monospace;
-    font-size:0.72rem;
-    color:var(--accent);
-    letter-spacing:0.15em;
-    text-transform:uppercase;
-    margin-bottom:1.2rem;
-    display:flex; align-items:center; gap:0.6rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
   }
-  .eyebrow::before { content:''; display:inline-block; width:24px; height:1px; background:var(--accent); }
+  .eyebrow::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+  }
 
   h1 {
-    font-family:'Bebas Neue',sans-serif;
-    font-size:clamp(3rem,8vw,5.5rem);
-    line-height:0.95;
-    letter-spacing:0.02em;
-    margin-bottom:2.5rem;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(3rem, 8vw, 5.5rem);
+    line-height: 0.95;
+    letter-spacing: 0.02em;
+    margin-bottom: 2.5rem;
   }
-  h1 em { font-style:normal; color:var(--accent); }
+  h1 em { font-style: normal; color: var(--accent); display: block; }
 
   .bio {
-    font-size:1rem;
-    line-height:1.8;
-    color:var(--text-muted);
-    font-weight:300;
-    margin-bottom:3rem;
+    font-size: 1rem;
+    line-height: 1.8;
+    color: var(--text-muted);
+    font-weight: 300;
+    margin-bottom: 3rem;
   }
-  .bio strong { color:var(--text); font-weight:600; }
+  .bio strong { color: var(--text); font-weight: 600; }
 
   .divider {
-    border:none;
-    border-top:1px solid var(--border);
-    margin:2.5rem 0;
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2.5rem 0;
   }
 
+  /* ── LINKS ── */
   .links {
-    display:flex;
-    flex-direction:column;
-    gap:0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
   .link-item {
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:12px;
-    padding:1rem 1.25rem;
-    text-decoration:none;
-    color:var(--text);
-    transition:all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    text-decoration: none;
+    color: var(--text);
+    transition: all 0.2s;
   }
-  .link-item:hover { border-color:var(--accent); transform:translateX(4px); }
-  .link-left { display:flex; align-items:center; gap:0.85rem; }
-  .link-icon { font-size:1.2rem; }
-  .link-label { font-weight:600; font-size:0.95rem; }
-  .link-sub { font-size:0.75rem; color:var(--text-dim); margin-top:0.1rem; }
-  .link-arrow { color:var(--accent); font-size:0.85rem; opacity:0; transition:opacity 0.2s; }
-  .link-item:hover .link-arrow { opacity:1; }
+  .link-item:hover { border-color: var(--accent); transform: translateX(4px); }
+  .link-left { display: flex; align-items: center; gap: 0.85rem; }
+  .link-icon { font-size: 1.2rem; }
+  .link-label { font-weight: 600; font-size: 0.95rem; }
+  .link-sub { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.1rem; }
+  .link-arrow { color: var(--accent); font-size: 0.85rem; opacity: 0; transition: opacity 0.2s; }
+  .link-item:hover .link-arrow { opacity: 1; }
 
   /* ── FOOTER ── */
   footer {
-    border-top:1px solid var(--border);
-    padding:2rem;
-    text-align:center;
-    font-size:0.75rem;
-    color:var(--text-dim);
-    font-family:'Space Mono',monospace;
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
   }
-  footer span { color:var(--accent); }
+  footer span { color: var(--accent); }
 
-  ::-webkit-scrollbar { width:6px; }
-  ::-webkit-scrollbar-track { background:var(--bg); }
-  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 768px) {
+    nav { display: none; }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <a class="logo" href="index.html"><span>[</span>JOSHEMVE<span>]</span></a>
+  <a class="logo" href="index.html">
+    <span class="bracket">[</span><span class="name"><span style="font-size:1.15em;">J</span>OSHEMVE <span style="font-size:1.15em;">M</span>ODPACK <span style="font-size:1.15em;">A</span>RCHIVE</span><span class="bracket">]</span>
+  </a>
   <nav>
     <a href="index.html">Archive</a>
     <a href="https://www.youtube.com/Joshemve" target="_blank">Videos</a>
@@ -148,11 +198,11 @@
   <h1>Modded<br><em>Minecraft.</em></h1>
 
   <p class="bio">
-    <strong>Joshemve</strong> is a Minecraft content creator focused on modded gameplay, 
-    modpack events, and community-driven series. From massive war simulations to deep magic 
+    <strong>Joshemve</strong> is a Minecraft content creator focused on modded gameplay,
+    modpack events, and community-driven series. From massive war simulations to deep magic
     progression, every pack is built to create a unique experience for players and viewers alike.
     <br><br>
-    This archive is the home of a few of the modpacks Joshemve has released — past and present. 
+    This archive is the home of a few of the modpacks Joshemve has released — past and present.
     Each pack (if there is one) is tied to a YouTube video.
   </p>
 
@@ -183,7 +233,7 @@
 </div>
 
 <footer>
-  <span>JOSHEMVE</span> — Modpack archive · Joshemve modded Minecraft events
+  <span>JMA</span> — Joshemve Modpack Archive · modded Minecraft events
 </footer>
 
 </body>
