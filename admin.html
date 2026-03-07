@@ -761,6 +761,7 @@
           <div class="stat-card"><div class="stat-card-num" id="aVisits">—</div><div class="stat-card-label">Total Visits</div></div>
           <div class="stat-card"><div class="stat-card-num" id="aUnique">—</div><div class="stat-card-label">Unique Visitors</div></div>
           <div class="stat-card"><div class="stat-card-num" id="aDownloads">—</div><div class="stat-card-label">Download Clicks</div></div>
+          <div class="stat-card"><div class="stat-card-num" id="aLikes" style="color:#ff6b6b;">—</div><div class="stat-card-label">Total Likes</div></div>
         </div>
 
         <!-- Chart -->
@@ -771,9 +772,17 @@
         </div>
 
         <!-- Top packs -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:1.5rem;">
           <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);">// Most Viewed Packs</div>
           <div id="analyticsTopPacks" style="padding:0.5rem 0;">
+            <div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.82rem;">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Most liked packs -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+          <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);">// Most Liked Packs</div>
+          <div id="analyticsMostLiked" style="padding:0.5rem 0;">
             <div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.82rem;">Loading…</div>
           </div>
         </div>
@@ -1345,9 +1354,11 @@ async function loadAnalytics() {
     document.getElementById('aVisits').textContent    = data.total_visits.toLocaleString();
     document.getElementById('aUnique').textContent    = data.unique_visitors.toLocaleString();
     document.getElementById('aDownloads').textContent = data.total_downloads.toLocaleString();
+    document.getElementById('aLikes').textContent     = (data.total_likes || 0).toLocaleString();
 
     renderAnalyticsChart(data.daily);
     renderTopPacks(data.top_packs);
+    renderMostLiked(data.most_liked || []);
   } catch(e) {
     showToast('Failed to load analytics: ' + e.message, true);
   }
@@ -1394,6 +1405,22 @@ function renderTopPacks(packs) {
       <span class="top-pack-name">${p.name}</span>
       <div class="top-pack-bar-wrap"><div class="top-pack-bar" style="width:${(p.views/max*100).toFixed(1)}%"></div></div>
       <span class="top-pack-count">${p.views}</span>
+    </div>`).join('');
+}
+
+function renderMostLiked(packs) {
+  const el = document.getElementById('analyticsMostLiked');
+  if (!packs.length) {
+    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.82rem;">No likes recorded yet.</div>';
+    return;
+  }
+  const max = packs[0].likes;
+  el.innerHTML = packs.map((p, i) => `
+    <div class="top-pack-row">
+      <span class="top-pack-rank">#${i+1}</span>
+      <span class="top-pack-name">${p.name}</span>
+      <div class="top-pack-bar-wrap"><div class="top-pack-bar" style="width:${(p.likes/max*100).toFixed(1)}%;background:#ff6b6b;"></div></div>
+      <span class="top-pack-count" style="color:#ff6b6b;">♥ ${p.likes}</span>
     </div>`).join('');
 }
 
