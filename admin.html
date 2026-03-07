@@ -337,6 +337,24 @@
   }
   .pack-row-dl { font-size:0.82rem; color:var(--text-muted); }
 
+  .chart-bar-wrap { display:flex; flex-direction:column; align-items:center; flex:1; }
+  .chart-bar {
+    width:100%; border-radius:3px 3px 0 0;
+    background:var(--accent); opacity:0.7;
+    transition:opacity 0.15s; cursor:default; min-height:2px;
+  }
+  .chart-bar:hover { opacity:1; }
+  .top-pack-row {
+    display:flex; align-items:center; gap:0.75rem;
+    padding:0.7rem 1.25rem; border-bottom:1px solid var(--border);
+  }
+  .top-pack-row:last-child { border-bottom:none; }
+  .top-pack-rank { font-family:'Space Mono',monospace; font-size:0.68rem; color:var(--text-dim); width:20px; flex-shrink:0; }
+  .top-pack-name { flex:1; font-size:0.85rem; font-weight:500; }
+  .top-pack-bar-wrap { flex:2; background:var(--surface2); border-radius:100px; height:6px; overflow:hidden; }
+  .top-pack-bar { height:100%; background:var(--accent); border-radius:100px; }
+  .top-pack-count { font-family:'Space Mono',monospace; font-size:0.68rem; color:var(--text-muted); width:40px; text-align:right; flex-shrink:0; }
+
   .drag-handle {
     display:flex; align-items:center; justify-content:center;
     width:24px; color:var(--text-dim); cursor:grab; font-size:1rem;
@@ -673,6 +691,9 @@
         <div class="nav-item" onclick="showView('add', this); openAddForm()">
           <span class="nav-icon">＋</span> Add Pack
         </div>
+        <div class="nav-item" onclick="showView('analytics', this); loadAnalytics()">
+          <span class="nav-icon">◎</span> Analytics
+        </div>
         <div class="nav-item" onclick="window.open('index.html','_blank')">
           <span class="nav-icon">↗</span> View Site
         </div>
@@ -722,6 +743,39 @@
             <div style="text-align:right">Actions</div>
           </div>
           <div id="packTableBody"></div>
+        </div>
+      </div>
+
+
+      <!-- Analytics -->
+      <div class="view" id="view-analytics">
+        <div class="view-header">
+          <div class="view-title">
+            <small>// Analytics</small>
+            <h2>Site Analytics</h2>
+          </div>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="stat-grid" id="analyticsStats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:2rem;">
+          <div class="stat-card"><div class="stat-card-num" id="aVisits">—</div><div class="stat-card-label">Total Visits</div></div>
+          <div class="stat-card"><div class="stat-card-num" id="aUnique">—</div><div class="stat-card-label">Unique Visitors</div></div>
+          <div class="stat-card"><div class="stat-card-num" id="aDownloads">—</div><div class="stat-card-label">Download Clicks</div></div>
+        </div>
+
+        <!-- Chart -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem;margin-bottom:2rem;">
+          <div style="font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:1.25rem;">// Visits — Last 30 Days</div>
+          <div id="analyticsChart" style="height:140px;display:flex;align-items:flex-end;gap:3px;"></div>
+          <div id="analyticsChartLabels" style="display:flex;justify-content:space-between;margin-top:0.4rem;font-size:0.6rem;font-family:'Space Mono',monospace;color:var(--text-dim);"></div>
+        </div>
+
+        <!-- Top packs -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+          <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);">// Most Viewed Packs</div>
+          <div id="analyticsTopPacks" style="padding:0.5rem 0;">
+            <div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.82rem;">Loading…</div>
+          </div>
         </div>
       </div>
 
@@ -1281,6 +1335,67 @@ async function savePack() {
   }
 }
 
+
+
+// ── ANALYTICS ─────────────────────────────────────────────────────────────
+async function loadAnalytics() {
+  try {
+    const data = await apiFetch('/analytics');
+
+    document.getElementById('aVisits').textContent    = data.total_visits.toLocaleString();
+    document.getElementById('aUnique').textContent    = data.unique_visitors.toLocaleString();
+    document.getElementById('aDownloads').textContent = data.total_downloads.toLocaleString();
+
+    renderAnalyticsChart(data.daily);
+    renderTopPacks(data.top_packs);
+  } catch(e) {
+    showToast('Failed to load analytics: ' + e.message, true);
+  }
+}
+
+function renderAnalyticsChart(daily) {
+  // Fill in missing days for last 30 days
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0,10);
+    const found = daily.find(r => r.day === key);
+    days.push({ day: key, count: found ? found.count : 0 });
+  }
+
+  const max = Math.max(...days.map(d => d.count), 1);
+  const chart  = document.getElementById('analyticsChart');
+  const labels = document.getElementById('analyticsChartLabels');
+
+  chart.innerHTML = days.map(d => {
+    const pct = Math.max((d.count / max) * 100, d.count > 0 ? 4 : 1);
+    return `<div class="chart-bar-wrap" title="${d.day}: ${d.count} visits">
+      <div class="chart-bar" style="height:${pct}%"></div>
+    </div>`;
+  }).join('');
+
+  // Show labels for 1st of each month + first/last day
+  labels.innerHTML = days.map((d, i) => {
+    const show = i === 0 || i === 29 || d.day.endsWith('-01');
+    return `<span style="flex:1;text-align:center;">${show ? d.day.slice(5) : ''}</span>`;
+  }).join('');
+}
+
+function renderTopPacks(packs) {
+  const el = document.getElementById('analyticsTopPacks');
+  if (!packs.length) {
+    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.82rem;">No pack views recorded yet.</div>';
+    return;
+  }
+  const max = packs[0].views;
+  el.innerHTML = packs.map((p, i) => `
+    <div class="top-pack-row">
+      <span class="top-pack-rank">#${i+1}</span>
+      <span class="top-pack-name">${p.name}</span>
+      <div class="top-pack-bar-wrap"><div class="top-pack-bar" style="width:${(p.views/max*100).toFixed(1)}%"></div></div>
+      <span class="top-pack-count">${p.views}</span>
+    </div>`).join('');
+}
 
 // ── DRAG TO REORDER ───────────────────────────────────────────────────────
 let dragSrc = null;
