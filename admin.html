@@ -1388,12 +1388,11 @@ function renderAnalyticsChart(daily, dailyLikes) {
     const p = pts(key);
     const linePath = p.map((pt, i) => (i===0?'M':'L') + pt[0].toFixed(2)+','+pt[1].toFixed(2)).join(' ');
     const fillPath = linePath + ` L${p[p.length-1][0].toFixed(2)},${H} L${p[0][0].toFixed(2)},${H} Z`;
-    // Dots rendered in a separate group WITHOUT the scaling transform
     const dots = p.map((pt, i) =>
       `<circle data-x="${pt[0].toFixed(2)}" data-y="${pt[1].toFixed(2)}"
+        data-day="${days[i].day}" data-visits="${days[i].visits}" data-likes="${days[i].likes}"
         r="3.5" fill="${color}" stroke="var(--bg)" stroke-width="1.5"
-        style="cursor:default;" opacity="0" class="chart-dot"
-        ><title>${days[i].day}\nVisits: ${days[i].visits}  Likes: ${days[i].likes}</title></circle>`
+        opacity="0" class="chart-dot"></circle>`
     ).join('');
     return { linePath, fillPath, dots, color };
   }
@@ -1418,24 +1417,57 @@ function renderAnalyticsChart(daily, dailyLikes) {
             stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
         `).join('')}
       </svg>
-      <!-- Dots overlay: positioned absolutely so they don't distort -->
-      <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;"
-        id="chartDots"
-        onmouseover="document.querySelectorAll('.chart-dot').forEach(d=>d.setAttribute('opacity','1'))"
-        onmouseout="document.querySelectorAll('.chart-dot').forEach(d=>d.setAttribute('opacity','0'))">
+      <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;" id="chartDots">
         ${lines.map(l => `<g>${l.dots}</g>`).join('')}
       </svg>
+      <div id="chartTooltip" style="
+        position:absolute;pointer-events:none;opacity:0;transition:opacity 0.12s;
+        background:var(--surface);border:1px solid var(--border);border-radius:8px;
+        padding:0.45rem 0.7rem;font-family:'Space Mono',monospace;
+        white-space:nowrap;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,0.45);
+      ">
+        <div id="chartTipDay" style="color:var(--text-dim);font-size:0.62rem;margin-bottom:0.25rem;"></div>
+        <div style="display:flex;gap:0.7rem;font-size:0.72rem;">
+          <span id="chartTipVisits" style="color:#7eff6a;"></span>
+          <span id="chartTipLikes"  style="color:#ff6b6b;"></span>
+        </div>
+      </div>
     </div>`;
 
-  // Position dots using percentage-based layout matching the SVG viewBox
   requestAnimationFrame(() => {
     const container = chart.querySelector('#chartDots');
-    const rect = container.getBoundingClientRect();
+    const tooltip   = chart.querySelector('#chartTooltip');
+    const wrapRect  = chart.querySelector('div').getBoundingClientRect();
+    const rect      = container.getBoundingClientRect();
+
     container.querySelectorAll('.chart-dot').forEach(dot => {
       const px = parseFloat(dot.dataset.x) / W * rect.width;
       const py = parseFloat(dot.dataset.y) / H * rect.height;
       dot.setAttribute('cx', px);
       dot.setAttribute('cy', py);
+
+      dot.addEventListener('mouseenter', () => {
+        container.querySelectorAll('.chart-dot').forEach(d => d.setAttribute('opacity','1'));
+        dot.setAttribute('r','5');
+        chart.querySelector('#chartTipDay').textContent    = dot.dataset.day;
+        chart.querySelector('#chartTipVisits').textContent = '↑ ' + dot.dataset.visits + ' views';
+        chart.querySelector('#chartTipLikes').textContent  = '♥ ' + dot.dataset.likes  + ' likes';
+        // Position tooltip above the dot, clamped inside chart
+        const tipW = 130, tipH = 52;
+        let left = px - tipW/2;
+        let top  = py - tipH - 10;
+        if (left < 4) left = 4;
+        if (left + tipW > rect.width - 4) left = rect.width - tipW - 4;
+        if (top < 4) top = py + 14;
+        tooltip.style.left    = left + 'px';
+        tooltip.style.top     = top  + 'px';
+        tooltip.style.opacity = '1';
+      });
+      dot.addEventListener('mouseleave', () => {
+        dot.setAttribute('r','3.5');
+        tooltip.style.opacity = '0';
+        container.querySelectorAll('.chart-dot').forEach(d => d.setAttribute('opacity','0'));
+      });
     });
   });
 
@@ -1457,7 +1489,6 @@ function renderTopPacks(packs, mostLiked) {
   (mostLiked||[]).forEach(l => { likesMap[l.pack_id] = l.likes; });
 
   const maxViews = packs[0].views;
-  const maxLikes = Math.max(...packs.map(p => likesMap[p.pack_id]||0), 1);
 
   el.innerHTML = packs.map((p, i) => {
     const likes = likesMap[p.pack_id] || 0;
@@ -1474,7 +1505,7 @@ function renderTopPacks(packs, mostLiked) {
       </div>
       <div style="display:flex;align-items:center;gap:0.6rem;padding-left:2.2rem;">
         <span style="font-size:0.65rem;font-family:'Space Mono',monospace;color:var(--text-dim);width:3.5rem;">Likes</span>
-        <div class="top-pack-bar-wrap" style="flex:1;"><div class="top-pack-bar" style="width:${likes>0?(likes/maxLikes*100).toFixed(1):0}%;background:#ff6b6b;"></div></div>
+        <div class="top-pack-bar-wrap" style="flex:1;"><div class="top-pack-bar" style="width:${likes>0?(likes/maxViews*100).toFixed(1):0}%;background:#ff6b6b;"></div></div>
         <span class="top-pack-count" style="color:${likes>0?'#ff6b6b':'var(--text-dim)'};">${likes > 0 ? '♥ '+likes : '—'}</span>
       </div>
     </div>`;
