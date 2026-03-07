@@ -397,6 +397,122 @@
       color: var(--text-dim);
       font-weight: 500;
     }
+    /* ── SHARE / LIKE ── */
+    .action-bar {
+      display: flex;
+      gap: 0.6rem;
+      margin-top: 1.25rem;
+    }
+    .btn-like, .btn-share {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.55rem 1rem;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-like:hover  { border-color: #ff6b6b; color: #ff6b6b; }
+    .btn-like.liked  { background: rgba(255,107,107,0.1); border-color: #ff6b6b; color: #ff6b6b; }
+    .btn-share:hover { border-color: var(--accent3); color: var(--accent3); }
+    .like-count { font-family: 'Space Mono', monospace; font-size: 0.75rem; }
+
+    /* Share popup */
+    .share-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 500;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .share-overlay.open { opacity: 1; pointer-events: all; }
+    .share-popup {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 420px;
+      margin: 1rem;
+      transform: translateY(12px);
+      transition: transform 0.2s;
+    }
+    .share-overlay.open .share-popup { transform: translateY(0); }
+    .share-popup-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.3rem;
+      letter-spacing: 0.06em;
+      margin-bottom: 1rem;
+    }
+    .share-url-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .share-url-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.85rem;
+      color: var(--text-muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      outline: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .share-copy-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      color: var(--text-muted);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .share-copy-btn:hover  { border-color: var(--accent); color: var(--accent); }
+    .share-copy-btn.copied { border-color: var(--accent); color: var(--accent); background: rgba(126,255,106,0.08); }
+    .share-native-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 0.6rem;
+    }
+    .share-native-btn:hover { background: #9fff8a; }
+    .share-close-btn {
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem;
+      color: var(--text-muted);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .share-close-btn:hover { border-color: var(--text-muted); color: var(--text); }
+
     .related-tag.match {
       background: rgba(126,255,106,0.08);
       border-color: rgba(126,255,106,0.25);
@@ -663,6 +779,15 @@
               <div class="pack-eyebrow">// JMA</div>
               <div class="pack-title">${p.name}</div>
               <div class="pack-badges">${badgesHtml}</div>
+              <div class="action-bar">
+                <button class="btn-like" id="likeBtn" onclick="toggleLike()">
+                  <span id="likeIcon">♡</span>
+                  <span class="like-count" id="likeCount">—</span>
+                </button>
+                <button class="btn-share" onclick="openShare()">
+                  ↗ Share
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -718,6 +843,79 @@
       `linear-gradient(135deg, ${c0} 0%, ${darken(c1)} 100%)`;
   }
 
+
+  // ── LIKE & SHARE ──────────────────────────────────────────────────────────
+  let currentPackId = null;
+
+  async function loadLikes(packId) {
+    try {
+      const res = await fetch(`${API}/packs/${packId}/like`);
+      const data = await res.json();
+      updateLikeUI(data.liked, data.count);
+    } catch(e) {}
+  }
+
+  async function toggleLike() {
+    if (!currentPackId) return;
+    const btn = document.getElementById('likeBtn');
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API}/packs/${currentPackId}/like`, { method: 'POST' });
+      const data = await res.json();
+      updateLikeUI(data.liked, data.count);
+    } catch(e) {}
+    btn.disabled = false;
+  }
+
+  function updateLikeUI(liked, count) {
+    const btn  = document.getElementById('likeBtn');
+    const icon = document.getElementById('likeIcon');
+    const cnt  = document.getElementById('likeCount');
+    if (!btn) return;
+    icon.textContent = liked ? '♥' : '♡';
+    cnt.textContent  = count > 0 ? count : '0';
+    btn.classList.toggle('liked', liked);
+  }
+
+  function openShare() {
+    const url = window.location.href;
+    document.getElementById('shareUrlInput').value = url;
+    document.getElementById('shareCopyBtn').classList.remove('copied');
+    document.getElementById('shareCopyBtn').textContent = 'Copy';
+    // Hide native share button if not supported
+    document.getElementById('shareNativeBtn').style.display =
+      navigator.share ? 'block' : 'none';
+    document.getElementById('shareOverlay').classList.add('open');
+  }
+
+  function closeShare(e) {
+    if (!e || e.target === document.getElementById('shareOverlay')) {
+      document.getElementById('shareOverlay').classList.remove('open');
+    }
+  }
+
+  function copyShareUrl() {
+    const input = document.getElementById('shareUrlInput');
+    navigator.clipboard.writeText(input.value).then(() => {
+      const btn = document.getElementById('shareCopyBtn');
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  async function nativeShare() {
+    try {
+      await navigator.share({
+        title: document.title,
+        url: window.location.href,
+      });
+    } catch(e) {}
+  }
+
+  // Close share on Escape key
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShare(); });
+
   async function init() {
     const id = getPackId();
     if (!id) { renderError('No pack ID specified.'); return; }
@@ -732,7 +930,9 @@
       if (!res.ok) throw new Error('Pack not found');
       const pack    = await res.json();
       const allPacks = allRes.ok ? await allRes.json() : [];
+      currentPackId = pack.id;
       renderPack(pack, allPacks);
+      loadLikes(pack.id);
     } catch (e) {
       renderError('Pack not found or failed to load.');
     }
@@ -740,5 +940,18 @@
 
   init();
 </script>
+<!-- Share popup -->
+<div class="share-overlay" id="shareOverlay" onclick="closeShare(event)">
+  <div class="share-popup">
+    <div class="share-popup-title">Share Pack</div>
+    <div class="share-url-row">
+      <input class="share-url-input" id="shareUrlInput" readonly>
+      <button class="share-copy-btn" id="shareCopyBtn" onclick="copyShareUrl()">Copy</button>
+    </div>
+    <button class="share-native-btn" id="shareNativeBtn" onclick="nativeShare()">↗ Share</button>
+    <button class="share-close-btn" onclick="closeShare()">Close</button>
+  </div>
+</div>
+
 </body>
 </html>
