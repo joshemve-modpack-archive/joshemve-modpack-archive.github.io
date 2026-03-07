@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="google-site-verification" content="l47VnqAl0mN8yVZA769zWHIDNsk53Tiu3Qyd4GiQafM" />
+<meta name="google-site-verification" content="l47VnqAl0mN8yVZA769zWHIDNsk53Tiu3Qyd4GiQafM" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JMA - Pack</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -322,6 +322,87 @@
     .ia-notice a { color: var(--accent3); text-decoration: none; }
     .ia-notice a:hover { text-decoration: underline; }
 
+    .related-section {
+      max-width: 960px;
+      margin: 2rem auto 0;
+      padding: 0 2rem 4rem;
+    }
+    .related-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+    .related-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.2s;
+    }
+    .related-card:hover {
+      border-color: rgba(126,255,106,0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    }
+    .related-card-header {
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .related-card-art {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    .related-card-art .block { border-radius: 3px; }
+    .related-card-body { padding: 0.75rem 0.9rem; }
+    .related-card-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.04em;
+      line-height: 1.1;
+      margin-bottom: 0.3rem;
+    }
+    .related-card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+    }
+    .related-tag {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 0.12rem 0.5rem;
+      font-size: 0.6rem;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+    .related-tag.match {
+      background: rgba(126,255,106,0.08);
+      border-color: rgba(126,255,106,0.25);
+      color: var(--accent);
+    }
+
     /* ── BACK BREADCRUMB ── */
     .breadcrumb {
       max-width: 900px; margin: 0 auto;
@@ -458,7 +539,7 @@
       </div>`;
   }
 
-  function renderPack(p) {
+  function renderPack(p, allPacks=[]) {
     document.title = `JMA - ${p.name}`;
     track('pageview', { pack_id: p.id });
 
@@ -531,6 +612,44 @@
       ? `<div class="ia-notice">Files hosted on <a href="https://archive.org" target="_blank">Internet Archive</a>. May take a few minutes after new uploads to become available.</div>`
       : '';
 
+    // Related packs — shared tags only, exclude self, max 4
+    const myTags = new Set((p.tags||[]).map(t => t.toLowerCase()));
+    const related = allPacks
+      .filter(other => other.id !== p.id)
+      .map(other => {
+        const shared = (other.tags||[]).filter(t => myTags.has(t.toLowerCase()));
+        return { ...other, sharedTags: shared };
+      })
+      .filter(other => other.sharedTags.length > 0)
+      .sort((a,b) => b.sharedTags.length - a.sharedTags.length)
+      .slice(0, 4);
+
+    const relatedHtml = related.length ? `
+      <div class="related-section">
+        <div class="related-label">// Related Packs</div>
+        <div class="related-grid">
+          ${related.map(r => {
+            const rc = r.colors || ['#333','#444','#555','#333'];
+            const sharedLower = r.sharedTags.map(s => s.toLowerCase());
+            const art = r.thumb
+              ? `<img src="${r.thumb}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;position:relative;z-index:1;box-shadow:0 4px 16px rgba(0,0,0,0.4);">`
+              : `<div class="related-card-art"><div class="block" style="background:${rc[0]}"></div><div class="block" style="background:${rc[1]}"></div><div class="block" style="background:${rc[2]}"></div><div class="block" style="background:${rc[3]}"></div></div>`;
+            const tagsHtmlR = (r.tags||[]).map(t =>
+              `<span class="related-tag${sharedLower.includes(t.toLowerCase()) ? ' match' : ''}">${t}</span>`
+            ).join('');
+            return `<a class="related-card" href="pack.html?id=${r.id}">
+              <div class="related-card-header" style="background:linear-gradient(135deg,${darken(rc[0])},${darken(rc[1]||rc[0])});">
+                ${art}
+              </div>
+              <div class="related-card-body">
+                <div class="related-card-name">${r.name}</div>
+                <div class="related-card-tags">${tagsHtmlR}</div>
+              </div>
+            </a>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+
     document.getElementById('app').innerHTML = `
       <div class="fade-in">
         <!-- Hero -->
@@ -590,6 +709,8 @@
             </div>
           </div>
         </div>
+
+        ${relatedHtml}
       </div>`;
 
     // Apply hero gradient from pack colors
@@ -604,10 +725,14 @@
     renderLoading();
 
     try {
-      const res = await fetch(`${API}/packs/${id}`);
+      const [res, allRes] = await Promise.all([
+        fetch(`${API}/packs/${id}`),
+        fetch(`${API}/packs`)
+      ]);
       if (!res.ok) throw new Error('Pack not found');
-      const pack = await res.json();
-      renderPack(pack);
+      const pack    = await res.json();
+      const allPacks = allRes.ok ? await allRes.json() : [];
+      renderPack(pack, allPacks);
     } catch (e) {
       renderError('Pack not found or failed to load.');
     }
