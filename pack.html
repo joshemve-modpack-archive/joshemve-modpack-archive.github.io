@@ -399,6 +399,14 @@
 <script>
   const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
 
+  function track(type, data={}) {
+    fetch(`${API}/track`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({type, page:'pack', ...data})
+    }).catch(()=>{});
+  }
+
   function getPackId() {
     return new URLSearchParams(window.location.search).get('id');
   }
@@ -451,6 +459,7 @@
 
   function renderPack(p) {
     document.title = `JMA - ${p.name}`;
+    track('pageview', { pack_id: p.id });
 
     const c0 = p.colors?.[0] || '#1e3a5f';
     const c1 = p.colors?.[1] || '#0a1628';
@@ -500,7 +509,7 @@
           const ext   = f.name.split('.').pop().toUpperCase();
           const color = extColors[ext] || '#7a7f8e';
           const base  = f.name.replace(/\.[^.]+$/, '');
-          return `<a class="dl-file" href="${f.url}" target="_blank" rel="noopener" title="${f.name}">
+          return `<a class="dl-file" href="${f.url}" target="_blank" rel="noopener" title="${f.name}" onclick="track('download',{pack_id:${p.id}})">
             <div class="dl-file-icon" style="background:${color}22;border:1px solid ${color}44;color:${color};">${ext}</div>
             <div class="dl-file-info">
               <div class="dl-file-name">${base}</div>
