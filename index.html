@@ -849,7 +849,7 @@
     <span class="section-title">// Featured Pack</span>
   </div>
 
-  <div class="featured-banner">
+  <a class="featured-banner" id="featuredBannerLink" href="#" style="text-decoration:none;color:inherit;display:grid;">
     <div class="featured-bg"></div>
     <div class="featured-art">
       <div class="pack-art-large" id="featuredArt"></div>
@@ -867,10 +867,7 @@
         <button class="btn-ghost" id="featuredWatchBtn">Watch Video →</button>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- CARDS GRID -->
+  </a>
 <div class="grid-section" id="cardsGrid">
   <div class="section-header">
     <span class="section-title">// All Packs</span>
@@ -1067,8 +1064,9 @@
     document.getElementById('featuredDesc').textContent = pick.desc || '';
     document.getElementById('featuredMcVer').innerHTML = `<span class="dot"></span> MC ${pick.mcVer}`;
     document.getElementById('featuredMods').innerHTML = `<span class="dot" style="background:var(--accent3)"></span> ${pick.mods||'?'} mods`;
-    document.getElementById('featuredWatchBtn').onclick = () => window.open(pick.videoUrl || 'https://www.youtube.com/Joshemve','_blank');
-    document.getElementById('featuredViewBtn').onclick = () => window.location.href = `pack.html?id=${pick.id}`;
+    document.getElementById('featuredBannerLink').href = `pack.html?id=${pick.id}`;
+    document.getElementById('featuredViewBtn').onclick = e => { e.preventDefault(); window.location.href = `pack.html?id=${pick.id}`; };
+    document.getElementById('featuredWatchBtn').onclick = e => { e.stopPropagation(); window.open(pick.videoUrl || 'https://www.youtube.com/Joshemve','_blank'); };
   }
 
   function renderTimeline(packs) {
