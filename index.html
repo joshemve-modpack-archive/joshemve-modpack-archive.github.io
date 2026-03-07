@@ -954,6 +954,16 @@
   // ── CONFIG — update this to your PythonAnywhere URL ──────────────────────
   const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
 
+
+  // ── ANALYTICS TRACKING ───────────────────────────────────────────────────
+  function track(type, data={}) {
+    fetch(`${API}/track`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({type, page:'index', ...data})
+    }).catch(()=>{});
+  }
+
   // ── API HELPERS ───────────────────────────────────────────────────────────
   let allPacks = [];
 
@@ -1153,6 +1163,7 @@
 
   // ── INIT ──────────────────────────────────────────────────────────────────
   window.addEventListener('DOMContentLoaded', async () => {
+    track('pageview');
     // Show loading state
     document.getElementById('cardContainer').innerHTML =
       '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
