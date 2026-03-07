@@ -1116,6 +1116,8 @@
       `<button class="filter-btn" onclick="filterCards(this, '${tag}')">${tag}</button>`
     ).join('');
   }
+
+  function filterCards(btn, filter) {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     activeFilter = filter;
