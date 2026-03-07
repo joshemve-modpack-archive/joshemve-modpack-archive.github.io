@@ -797,14 +797,18 @@
                 <img class="upload-preview" id="thumbPreview">
               </div>
             </div>
-            <!-- Pack file upload -->
+            <!-- Pack file registration -->
             <div class="form-group full">
-              <label class="form-label">Pack File (ZIP, MRPACK, JAR, etc.)</label>
-              <div class="multi-upload-zone" id="multiUploadZone" onclick="document.getElementById('packFilesInput').click()">
-                <input type="file" id="packFilesInput" style="display:none" onchange="handlePackFile(this)">
-                <div class="upload-icon" id="packUploadIcon">📦</div>
-                <div class="upload-text" id="packUploadText">Click to select file</div>
-                <div class="upload-sub">ZIP · MRPACK · JAR · any format — uploaded to Internet Archive</div>
+              <label class="form-label">Pack Files — from Internet Archive</label>
+              <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:0.75rem;line-height:1.6;padding:0.75rem 1rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+                📦 Upload your file at <a href="https://archive.org/upload" target="_blank" style="color:var(--accent3)">archive.org/upload</a>, then paste the direct download URL below.<br>
+                Direct URLs look like: <code style="color:var(--accent);font-size:0.7rem;">https://archive.org/download/your-item/yourfile.zip</code>
+              </div>
+              <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+                <input id="iaUrlInput" type="url" placeholder="https://archive.org/download/…/yourfile.zip"
+                  style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1rem;color:var(--text);font-family:'Outfit',sans-serif;font-size:0.85rem;outline:none;"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();addIAFile();}">
+                <button class="btn-ghost" onclick="addIAFile()" style="white-space:nowrap;padding:0.65rem 1.1rem;">+ Add</button>
               </div>
               <div class="file-list" id="packFileList"></div>
             </div>
@@ -1068,20 +1072,36 @@ function handleThumbUpload(input) {
   reader.readAsDataURL(file);
 }
 
-// ── PACK FILE ─────────────────────────────────────────────────────────────
-let packFile      = null; // single File object queued for upload
-let existingFiles = [];   // files already on IA for this pack
+// ── PACK FILES (IA URL registration) ────────────────────────────────────
+let pendingFiles  = []; // { name, url, size } — new URLs to register on save
+let existingFiles = []; // files already registered for this pack
 
-function handlePackFile(input) {
-  const f = input.files[0];
-  if (!f) return;
-  packFile = f;
+function addIAFile() {
+  const input = document.getElementById('iaUrlInput');
+  const url   = input.value.trim();
+  if (!url) return;
+
+  // Basic validation
+  if (!url.startsWith('https://archive.org/download/')) {
+    showToast('URL must start with https://archive.org/download/…', true);
+    return;
+  }
+
+  const name = decodeURIComponent(url.split('/').pop());
+  if (!name) { showToast('Could not parse filename from URL', true); return; }
+
+  // Avoid duplicates
+  if (pendingFiles.some(f => f.url === url) || existingFiles.some(f => f.url === url)) {
+    showToast('File already added', true); return;
+  }
+
+  pendingFiles.push({ name, url, size: 0 });
   input.value = '';
   renderPackFileList();
 }
 
-function removePackFile() {
-  packFile = null;
+function removePendingFile(url) {
+  pendingFiles = pendingFiles.filter(f => f.url !== url);
   renderPackFileList();
 }
 
@@ -1092,39 +1112,34 @@ function removeExistingFile(name) {
 
 function renderPackFileList() {
   const list = document.getElementById('packFileList');
-  const icon = document.getElementById('packUploadIcon');
-  const text = document.getElementById('packUploadText');
-  let html = '';
+  let html   = '';
 
   existingFiles.forEach(f => {
     const ext = f.name.split('.').pop().toUpperCase();
-    const size = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
     html += `<div class="file-item">
       <div class="file-item-left">
         <span class="file-ext">${ext}</span>
         <span class="file-name">${f.name}</span>
-        <span class="file-size">${size} · <a href="${f.url}" target="_blank" style="color:var(--accent3)">on IA</a></span>
+        <span class="file-size"><a href="${f.url}" target="_blank" style="color:var(--accent3)">on IA ↗</a></span>
       </div>
-      <button class="file-remove" onclick="removeExistingFile('${f.name.replace(/'/g,"\\'")}')">×</button>
+      <button class="file-remove" onclick="removeExistingFile('${f.name.replace(/'/g,"\'")}')">×</button>
     </div>`;
   });
 
-  if (packFile) {
-    const ext  = packFile.name.split('.').pop().toUpperCase();
-    const size = packFile.size > 1024*1024 ? (packFile.size/1024/1024).toFixed(1)+'MB' : Math.round(packFile.size/1024)+'KB';
+  pendingFiles.forEach(f => {
+    const ext = f.name.split('.').pop().toUpperCase();
     html += `<div class="file-item">
       <div class="file-item-left">
         <span class="file-ext">${ext}</span>
-        <span class="file-name">${packFile.name}</span>
-        <span class="file-size">${size} <span style="color:var(--accent);font-size:0.6rem;">NEW</span></span>
+        <span class="file-name">${f.name}</span>
+        <span class="file-size"><span style="color:var(--accent);font-size:0.6rem;">NEW</span></span>
       </div>
-      <button class="file-remove" onclick="removePackFile()">×</button>
+      <button class="file-remove" onclick="removePendingFile('${f.url.replace(/'/g,"\'")}')">×</button>
     </div>`;
-  }
+  });
 
+  if (!html) html = '<div style="font-size:0.78rem;color:var(--text-dim);padding:0.25rem 0;">No files registered yet.</div>';
   list.innerHTML = html;
-  if (icon) icon.style.display = (packFile || existingFiles.length) ? 'none' : 'block';
-  if (text) text.textContent   = (packFile || existingFiles.length) ? 'Click to replace / add file' : 'Click to select file';
 }
 
 // ── ADD FORM ──────────────────────────────────────────────────────────────
@@ -1143,12 +1158,10 @@ function clearForm() {
   currentTags = []; renderTags();
   selectedColors = ['#1e3a5f','#2563a8','#3b82c4','#1e3a5f'];
   thumbData = null;
-  packFile = null;
+  pendingFiles = []; existingFiles = [];
   renderPackFileList();
   const preview = document.getElementById('thumbPreview');
   preview.src=''; preview.style.display='none';
-  document.querySelector('.upload-icon').style.display='block';
-  document.querySelector('.upload-text').style.display='block';
   initColorPicker();
 }
 
@@ -1167,7 +1180,7 @@ function editPack(id) {
   document.getElementById('fMods').value        = p.mods || '';
   document.getElementById('fStatus').value      = p.status || 'active';
   document.getElementById('fYear').value        = p.year || '';
-  packFile = null;
+  pendingFiles = [];
   existingFiles = (p.files || []);
   renderPackFileList();
   currentTags = [...(p.tags||[])]; renderTags();
@@ -1223,45 +1236,15 @@ async function savePack() {
       }
     }
 
-    // Upload new file directly from browser → Internet Archive S3, then register in DB
-    if (packFile) {
-      saveBtn.textContent = 'Fetching upload credentials…';
-
-      // 1. Get IA credentials + identifier from backend
-      const creds = await apiFetch(`/packs/${savedPack.id}/ia-credentials`);
-
-      // 2. Upload directly to IA's S3 endpoint from the browser
-      saveBtn.textContent = 'Uploading to Archive.org… (this may take a minute)';
-      const iaUrl = `https://s3.us.archive.org/${creds.identifier}/${encodeURIComponent(packFile.name)}`;
-      const iaRes = await fetch(iaUrl, {
-        method: 'PUT',
-        headers: {
-          'Authorization':           `LOW ${creds.access_key}:${creds.secret_key}`,
-          'x-archive-auto-make-bucket': '1',
-          'x-archive-meta-title':    `Joshemve Modpack — ${creds.pack_name}`,
-          'x-archive-meta-mediatype':'software',
-          'x-archive-meta-subject':  'minecraft modpack',
-          'x-archive-meta-collection': creds.collection,
-          'Content-Type':            packFile.type || 'application/octet-stream',
-          'Content-Length':          packFile.size,
-        },
-        body: packFile,
-      });
-      if (!iaRes.ok) {
-        const txt = await iaRes.text();
-        throw new Error(`IA upload failed (${iaRes.status}): ${txt.slice(0,200)}`);
+    // Register any new IA URLs in the DB
+    if (pendingFiles.length) {
+      saveBtn.textContent = 'Registering files…';
+      for (const f of pendingFiles) {
+        await apiFetch(`/packs/${savedPack.id}/files/register`, {
+          method: 'POST',
+          body: JSON.stringify({ name: f.name, url: f.url, size: 0, mime_type: '' }),
+        });
       }
-
-      // 3. Tell backend to record the file in the DB
-      saveBtn.textContent = 'Registering file…';
-      await apiFetch(`/packs/${savedPack.id}/files/register`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name:      packFile.name,
-          size:      packFile.size,
-          mime_type: packFile.type || 'application/octet-stream',
-        }),
-      });
     }
 
     await loadPacks();
