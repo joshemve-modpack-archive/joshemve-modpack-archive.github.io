@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Loading… — Joshemve Modpack Archive</title>
+  <title>JMA - Pack</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -375,7 +375,7 @@
 <header>
   <a href="index.html" class="logo">
     <span class="bracket">[</span>
-    <span class="name">JOSHEMVE</span>
+    <span class="name"><span style="font-size:1.15em;">J</span>OSHEMVE <span style="font-size:1.15em;">M</span>ODPACK <span style="font-size:1.15em;">A</span>RCHIVE</span>
     <span class="bracket">]</span>
   </a>
   <nav>
@@ -442,7 +442,7 @@
   }
 
   function renderPack(p) {
-    document.title = `${p.name} — Joshemve Modpack Archive`;
+    document.title = `JMA - ${p.name}`;
 
     const c0 = p.colors?.[0] || '#1e3a5f';
     const c1 = p.colors?.[1] || '#0a1628';
@@ -523,7 +523,7 @@
           <div class="pack-hero-content">
             ${thumbHtml}
             <div class="pack-hero-meta">
-              <div class="pack-eyebrow">// Joshemve Modpack Archive</div>
+              <div class="pack-eyebrow">// JMA</div>
               <div class="pack-title">${p.name}</div>
               <div class="pack-badges">${badgesHtml}</div>
             </div>
