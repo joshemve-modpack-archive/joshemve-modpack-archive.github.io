@@ -833,7 +833,7 @@
       <span class="stat-label">Modpacks</span>
     </div>
     <div class="stat">
-      <span class="stat-num">2019</span>
+      <span class="stat-num">2026</span>
       <span class="stat-label">Est.</span>
     </div>
   </div>
@@ -851,34 +851,27 @@
 </div>
 
 <!-- FEATURED -->
-<div class="grid-section">
+<div class="grid-section" id="featuredSection" style="display:none">
   <div class="section-header">
     <span class="section-title">// Featured Pack</span>
   </div>
 
   <div class="featured-banner">
     <div class="featured-bg"></div>
-
     <div class="featured-art">
-      <div class="pack-art-large">
-        <div class="block" style="background: linear-gradient(135deg, #1a472a, #2d6a4f);"></div>
-        <div class="block" style="background: linear-gradient(135deg, #2d6a4f, #52b788);"></div>
-        <div class="block" style="background: linear-gradient(135deg, #40916c, #1b4332);"></div>
-        <div class="block" style="background: linear-gradient(135deg, #74c69d, #2d6a4f);"></div>
-      </div>
+      <div class="pack-art-large" id="featuredArt"></div>
     </div>
-
     <div class="featured-info">
       <div class="featured-badge">✦ Latest Release</div>
-      <div class="featured-title">Verdant Depths<br>Season 3</div>
-      <p class="featured-desc">The definitive cave & nature exploration experience. 320+ mods crafting an underground world unlike anything before. Custom biomes, new creatures, and deep progression.</p>
+      <div class="featured-title" id="featuredTitle"></div>
+      <p class="featured-desc" id="featuredDesc"></p>
       <div class="featured-meta">
-        <div class="meta-chip"><span class="dot"></span> MC 1.20.1</div>
-        <div class="meta-chip"><span class="dot" style="background:var(--accent3)"></span> 320 mods</div>
+        <div class="meta-chip" id="featuredMcVer"><span class="dot"></span></div>
+        <div class="meta-chip" id="featuredMods"><span class="dot" style="background:var(--accent3)"></span></div>
       </div>
       <div class="featured-actions">
-        <button class="btn-primary">Download Pack</button>
-        <button class="btn-ghost" onclick="window.open('https://www.youtube.com/Joshemve','_blank')">Watch Video →</button>
+        <button class="btn-primary" id="featuredViewBtn">View Pack →</button>
+        <button class="btn-ghost" id="featuredWatchBtn">Watch Video →</button>
       </div>
     </div>
   </div>
@@ -1059,28 +1052,24 @@
   }
 
   function renderFeatured(packs, featuredId) {
+    const section = document.getElementById('featuredSection');
+    if (!packs.length) { section.style.display = 'none'; return; }
+
     let pick = featuredId ? packs.find(p => p.id === featuredId) : null;
     if (!pick) pick = [...packs].filter(p => p.status === 'active').sort((a,b) => b.id - a.id)[0] || packs[0];
-    if (!pick) return;
-    const banner = document.querySelector('.featured-banner');
-    if (!banner) return;
+    if (!pick) { section.style.display = 'none'; return; }
+
+    section.style.display = '';
     const c = pick.colors || ['#1a472a','#2d6a4f','#40916c','#74c69d'];
-    banner.querySelector('.featured-bg').style.background =
+    document.querySelector('.featured-bg').style.background =
       `linear-gradient(135deg,${darken(c[0])} 0%,${darken(c[1]||c[0])} 50%,${darken(c[2]||c[0])} 100%)`;
-    banner.querySelector('.featured-art').innerHTML = artHTML(pick, 'large');
-    banner.querySelector('.featured-title').innerHTML = pick.name;
-    banner.querySelector('.featured-desc').textContent = pick.desc || '';
-    const chips = banner.querySelectorAll('.meta-chip');
-    if (chips[0]) chips[0].innerHTML = `<span class="dot"></span> MC ${pick.mcVer}`;
-    if (chips[1]) chips[1].innerHTML = `<span class="dot" style="background:var(--accent3)"></span> ${pick.mods||'?'} mods`;
-    const watchBtn = banner.querySelector('.btn-ghost');
-    if (watchBtn) { watchBtn.textContent = 'Watch Video →'; watchBtn.onclick = () => window.open(pick.videoUrl || 'https://www.youtube.com/Joshemve','_blank'); }
-    const dlBtn = banner.querySelector('.btn-primary');
-    if (dlBtn) {
-      dlBtn.textContent = 'View Pack →';
-      dlBtn.onclick = () => window.location.href = `pack.html?id=${pick.id}`;
-      dlBtn.style.opacity = '1';
-    }
+    document.getElementById('featuredArt').innerHTML = artHTML(pick, 'large');
+    document.getElementById('featuredTitle').textContent = pick.name;
+    document.getElementById('featuredDesc').textContent = pick.desc || '';
+    document.getElementById('featuredMcVer').innerHTML = `<span class="dot"></span> MC ${pick.mcVer}`;
+    document.getElementById('featuredMods').innerHTML = `<span class="dot" style="background:var(--accent3)"></span> ${pick.mods||'?'} mods`;
+    document.getElementById('featuredWatchBtn').onclick = () => window.open(pick.videoUrl || 'https://www.youtube.com/Joshemve','_blank');
+    document.getElementById('featuredViewBtn').onclick = () => window.location.href = `pack.html?id=${pick.id}`;
   }
 
   function renderTimeline(packs) {
