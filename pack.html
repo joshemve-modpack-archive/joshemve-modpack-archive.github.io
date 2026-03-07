@@ -244,12 +244,10 @@
     .dl-file:hover { background: var(--surface2); }
     .dl-file-icon {
       width: 36px; height: 36px;
-      background: rgba(126,255,106,0.08);
-      border: 1px solid rgba(126,255,106,0.2);
       border-radius: 7px;
       display: flex; align-items: center; justify-content: center;
       font-family: 'Space Mono', monospace;
-      font-size: 0.55rem; color: var(--accent);
+      font-size: 0.55rem; font-weight: 800;
       letter-spacing: 0.02em;
       flex-shrink: 0;
     }
@@ -488,14 +486,17 @@
       : '';
 
     // Download card files
+    const extColors = {ZIP:'#ff6b35',MRPACK:'#7eff6a',JAR:'#4db8ff',RAR:'#ff6b35','7Z':'#ff6b35',GZ:'#ff6b35'};
     const filesHtml = p.files?.length
       ? p.files.map(f => {
-          const ext = f.name.split('.').pop().toUpperCase();
-          return `<a class="dl-file" href="${f.url}" target="_blank" rel="noopener">
-            <div class="dl-file-icon">${ext}</div>
+          const ext   = f.name.split('.').pop().toUpperCase();
+          const color = extColors[ext] || '#7a7f8e';
+          const base  = f.name.replace(/\.[^.]+$/, '');
+          return `<a class="dl-file" href="${f.url}" target="_blank" rel="noopener" title="${f.name}">
+            <div class="dl-file-icon" style="background:${color}22;border:1px solid ${color}44;color:${color};">${ext}</div>
             <div class="dl-file-info">
-              <div class="dl-file-name">${f.name}</div>
-              <div class="dl-file-size">${fmtSize(f.size)} · archive.org</div>
+              <div class="dl-file-name">${base}</div>
+              <div class="dl-file-size">archive.org ↗</div>
             </div>
             <div class="dl-file-arrow">↓</div>
           </a>`;
