@@ -766,8 +766,14 @@
 
         <!-- Chart -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem;margin-bottom:2rem;">
-          <div style="font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:1.25rem;">// Visits — Last 30 Days</div>
-          <div id="analyticsChart" style="height:140px;display:flex;align-items:flex-end;gap:3px;"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+            <div style="font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);">// Visits &amp; Likes — Last 30 Days</div>
+            <div style="display:flex;gap:1rem;font-size:0.7rem;font-family:'Space Mono',monospace;">
+              <span style="display:flex;align-items:center;gap:0.35rem;color:var(--accent);"><span style="display:inline-block;width:18px;height:2px;background:var(--accent);border-radius:2px;"></span>Visits</span>
+              <span style="display:flex;align-items:center;gap:0.35rem;color:#ff6b6b;"><span style="display:inline-block;width:18px;height:2px;background:#ff6b6b;border-radius:2px;"></span>Likes</span>
+            </div>
+          </div>
+          <div id="analyticsChart" style="position:relative;height:140px;"></div>
           <div id="analyticsChartLabels" style="display:flex;justify-content:space-between;margin-top:0.4rem;font-size:0.6rem;font-family:'Space Mono',monospace;color:var(--text-dim);"></div>
         </div>
 
@@ -1356,7 +1362,7 @@ async function loadAnalytics() {
     document.getElementById('aDownloads').textContent = data.total_downloads.toLocaleString();
     document.getElementById('aLikes').textContent     = (data.total_likes || 0).toLocaleString();
 
-    renderAnalyticsChart(data.daily);
+    renderAnalyticsChart(data.daily, data.daily_likes || []);
     renderTopPacks(data.top_packs);
     renderMostLiked(data.most_liked || []);
   } catch(e) {
@@ -1364,28 +1370,59 @@ async function loadAnalytics() {
   }
 }
 
-function renderAnalyticsChart(daily) {
-  // Fill in missing days for last 30 days
+function renderAnalyticsChart(daily, dailyLikes) {
   const days = [];
   for (let i = 29; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0,10);
-    const found = daily.find(r => r.day === key);
-    days.push({ day: key, count: found ? found.count : 0 });
+    const v = daily.find(r => r.day === key);
+    const l = dailyLikes.find(r => r.day === key);
+    days.push({ day: key, visits: v ? v.count : 0, likes: l ? l.count : 0 });
   }
 
-  const max = Math.max(...days.map(d => d.count), 1);
-  const chart  = document.getElementById('analyticsChart');
+  const W = 700, H = 140, PAD = 8;
+  const max = Math.max(...days.map(d => Math.max(d.visits, d.likes)), 1);
+  const xStep = (W - PAD*2) / (days.length - 1);
+
+  function pts(key) {
+    return days.map((d, i) => {
+      const x = PAD + i * xStep;
+      const y = H - PAD - ((d[key] / max) * (H - PAD*2));
+      return [x, y];
+    });
+  }
+
+  function polyline(key, color) {
+    const p = pts(key);
+    const d = p.map((pt, i) => (i===0?'M':'L') + pt[0].toFixed(1)+','+pt[1].toFixed(1)).join(' ');
+    // Fill area under line
+    const fillD = d + ` L${p[p.length-1][0].toFixed(1)},${H-PAD} L${p[0][0].toFixed(1)},${H-PAD} Z`;
+    return `
+      <defs>
+        <linearGradient id="grad_${key}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="${fillD}" fill="url(#grad_${key})" />
+      <path d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+      ${pts(key).map((pt, i) => `
+        <circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="3" fill="${color}" opacity="0" class="dot">
+          <title>${days[i].day}: ${days[i][key]} ${key}</title>
+        </circle>
+      `).join('')}`;
+  }
+
+  const chart = document.getElementById('analyticsChart');
+  chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
+    style="width:100%;height:140px;overflow:visible;"
+    onmouseover="this.querySelectorAll('.dot').forEach(d=>d.setAttribute('opacity','1'))"
+    onmouseout="this.querySelectorAll('.dot').forEach(d=>d.setAttribute('opacity','0'))">
+    ${polyline('visits','#7eff6a')}
+    ${polyline('likes','#ff6b6b')}
+  </svg>`;
+
   const labels = document.getElementById('analyticsChartLabels');
-
-  chart.innerHTML = days.map(d => {
-    const pct = Math.max((d.count / max) * 100, d.count > 0 ? 4 : 1);
-    return `<div class="chart-bar-wrap" title="${d.day}: ${d.count} visits">
-      <div class="chart-bar" style="height:${pct}%"></div>
-    </div>`;
-  }).join('');
-
-  // Show labels for 1st of each month + first/last day
   labels.innerHTML = days.map((d, i) => {
     const show = i === 0 || i === 29 || d.day.endsWith('-01');
     return `<span style="flex:1;text-align:center;">${show ? d.day.slice(5) : ''}</span>`;
