@@ -797,21 +797,21 @@
                 <img class="upload-preview" id="thumbPreview">
               </div>
             </div>
-            <!-- Pack file uploads -->
+            <!-- Pack file upload -->
             <div class="form-group full">
-              <label class="form-label">Pack Files (ZIP, JAR, MRPACK, etc.)</label>
-              <div class="multi-upload-zone" id="multiUploadZone">
-                <input type="file" id="packFilesInput" multiple onchange="handlePackFiles(this)">
-                <div class="upload-icon">📦</div>
-                <div class="upload-text">Drop files or click to browse</div>
-                <div class="upload-sub">ZIP · JAR · MRPACK · any format · multiple files allowed</div>
+              <label class="form-label">Pack File (ZIP, MRPACK, JAR, etc.)</label>
+              <div class="multi-upload-zone" id="multiUploadZone" onclick="document.getElementById('packFilesInput').click()">
+                <input type="file" id="packFilesInput" style="display:none" onchange="handlePackFile(this)">
+                <div class="upload-icon" id="packUploadIcon">📦</div>
+                <div class="upload-text" id="packUploadText">Click to select file</div>
+                <div class="upload-sub">ZIP · MRPACK · JAR · any format — uploaded to Internet Archive</div>
               </div>
               <div class="file-list" id="packFileList"></div>
             </div>
           </div>
           <div class="form-actions">
             <button class="btn-ghost" onclick="showView('packs', document.querySelector('.nav-item:nth-child(2)'))">Cancel</button>
-            <button class="btn-primary" onclick="savePack()">Save Pack →</button>
+            <button class="btn-primary" id="savePackBtn" onclick="savePack()">Save Pack →</button>
           </div>
         </div>
       </div>
@@ -974,7 +974,7 @@ function renderPackTable() {
         </div>
       </div>
       <div><span class="badge badge-${p.status}">${p.status}</span></div>
-      <div class="pack-row-version">MC ${p.mcVer}<br>${p.packVer||''}${p.files?.length ? `<br><span style="color:var(--accent3);font-size:0.62rem;">📦 ${p.files.length} file${p.files.length>1?'s':''}</span>` : ''}</div>
+      <div class="pack-row-version">MC ${p.mcVer}<br>${p.packVer||''}${p.files?.length ? `<br><span style="color:var(--accent);font-size:0.62rem;">📦 ${p.files.length} file${p.files.length>1?'s':''}</span>` : ''}</div>
       <div class="row-actions">
         <button class="action-btn feat ${p.id === featuredPackId ? 'feat-active' : ''}" onclick="setFeatured(${p.id})" title="Set as featured">★</button>
         <button class="action-btn" onclick="editPack(${p.id})">Edit</button>
@@ -1068,47 +1068,63 @@ function handleThumbUpload(input) {
   reader.readAsDataURL(file);
 }
 
-// ── PACK FILES ────────────────────────────────────────────────────────────
-let packFiles    = []; // existing files from API {name, size}
-let newFileQueue = []; // File objects queued for upload
+// ── PACK FILE ─────────────────────────────────────────────────────────────
+let packFile      = null; // single File object queued for upload
+let existingFiles = [];   // files already on IA for this pack
 
-function handlePackFiles(input) {
-  const files = Array.from(input.files);
-  files.forEach(f => {
-    if (f.size > 500*1024*1024) { showToast(`${f.name} too large (max 500MB)`, true); return; }
-    if (!newFileQueue.find(x => x.name === f.name)) newFileQueue.push(f);
-  });
+function handlePackFile(input) {
+  const f = input.files[0];
+  if (!f) return;
+  packFile = f;
   input.value = '';
   renderPackFileList();
 }
 
-function removePackFile(name, isNew) {
-  if (isNew) newFileQueue = newFileQueue.filter(f => f.name !== name);
-  else       packFiles    = packFiles.filter(f => f.name !== name);
+function removePackFile() {
+  packFile = null;
+  renderPackFileList();
+}
+
+function removeExistingFile(name) {
+  existingFiles = existingFiles.filter(f => f.name !== name);
   renderPackFileList();
 }
 
 function renderPackFileList() {
   const list = document.getElementById('packFileList');
-  const all = [
-    ...packFiles.map(f => ({ ...f, isNew: false })),
-    ...newFileQueue.map(f => ({ name: f.name, size: f.size, isNew: true })),
-  ];
-  if (!all.length) { list.innerHTML = ''; return; }
-  list.innerHTML = all.map(f => {
-    const ext  = f.name.split('.').pop().toUpperCase();
+  const icon = document.getElementById('packUploadIcon');
+  const text = document.getElementById('packUploadText');
+  let html = '';
+
+  existingFiles.forEach(f => {
+    const ext = f.name.split('.').pop().toUpperCase();
     const size = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+'MB' : Math.round(f.size/1024)+'KB';
-    const newBadge = f.isNew ? '<span style="font-size:0.6rem;color:var(--accent);margin-left:4px;">NEW</span>' : '';
-    const safeName = f.name.replace(/'/g,"\\'");
-    return `<div class="file-item">
+    html += `<div class="file-item">
       <div class="file-item-left">
         <span class="file-ext">${ext}</span>
-        <span class="file-name" title="${f.name}">${f.name}</span>${newBadge}
-        <span class="file-size">${size}</span>
+        <span class="file-name">${f.name}</span>
+        <span class="file-size">${size} · <a href="${f.url}" target="_blank" style="color:var(--accent3)">on IA</a></span>
       </div>
-      <button class="file-remove" onclick="removePackFile('${safeName}', ${f.isNew})">×</button>
+      <button class="file-remove" onclick="removeExistingFile('${f.name.replace(/'/g,"\\'")}')">×</button>
     </div>`;
-  }).join('');
+  });
+
+  if (packFile) {
+    const ext  = packFile.name.split('.').pop().toUpperCase();
+    const size = packFile.size > 1024*1024 ? (packFile.size/1024/1024).toFixed(1)+'MB' : Math.round(packFile.size/1024)+'KB';
+    html += `<div class="file-item">
+      <div class="file-item-left">
+        <span class="file-ext">${ext}</span>
+        <span class="file-name">${packFile.name}</span>
+        <span class="file-size">${size} <span style="color:var(--accent);font-size:0.6rem;">NEW</span></span>
+      </div>
+      <button class="file-remove" onclick="removePackFile()">×</button>
+    </div>`;
+  }
+
+  list.innerHTML = html;
+  if (icon) icon.style.display = (packFile || existingFiles.length) ? 'none' : 'block';
+  if (text) text.textContent   = (packFile || existingFiles.length) ? 'Click to replace / add file' : 'Click to select file';
 }
 
 // ── ADD FORM ──────────────────────────────────────────────────────────────
@@ -1126,7 +1142,9 @@ function clearForm() {
   document.getElementById('fStatus').value = 'active';
   currentTags = []; renderTags();
   selectedColors = ['#1e3a5f','#2563a8','#3b82c4','#1e3a5f'];
-  thumbData = null; packFiles = []; newFileQueue = []; renderPackFileList();
+  thumbData = null;
+  packFile = null;
+  renderPackFileList();
   const preview = document.getElementById('thumbPreview');
   preview.src=''; preview.style.display='none';
   document.querySelector('.upload-icon').style.display='block';
@@ -1141,20 +1159,20 @@ function editPack(id) {
   document.getElementById('editId').value = id;
   document.getElementById('formEyebrow').textContent = '// Edit Pack';
   document.getElementById('formHeading').textContent = 'Edit Modpack';
-  document.getElementById('fName').value     = p.name;
-  document.getElementById('fVideoUrl').value  = p.videoUrl || '';
-  document.getElementById('fDesc').value     = p.desc || '';
-  document.getElementById('fMcVer').value    = p.mcVer || '';
-  document.getElementById('fPackVer').value  = p.packVer || '';
-  document.getElementById('fMods').value     = p.mods || '';
-  document.getElementById('fStatus').value   = p.status || 'active';
-  document.getElementById('fYear').value     = p.year || '';
+  document.getElementById('fName').value        = p.name;
+  document.getElementById('fVideoUrl').value    = p.videoUrl || '';
+  document.getElementById('fDesc').value        = p.desc || '';
+  document.getElementById('fMcVer').value       = p.mcVer || '';
+  document.getElementById('fPackVer').value     = p.packVer || '';
+  document.getElementById('fMods').value        = p.mods || '';
+  document.getElementById('fStatus').value      = p.status || 'active';
+  document.getElementById('fYear').value        = p.year || '';
+  packFile = null;
+  existingFiles = (p.files || []);
+  renderPackFileList();
   currentTags = [...(p.tags||[])]; renderTags();
   selectedColors = p.colors ? [...p.colors] : ['#333','#444','#555','#333'];
   thumbData = p.thumb || null;
-  packFiles = (p.files||[]).map(f => ({...f}));
-  newFileQueue = [];
-  renderPackFileList();
   if (thumbData) {
     const preview = document.getElementById('thumbPreview');
     preview.src = thumbData; preview.style.display='block';
@@ -1173,17 +1191,17 @@ async function savePack() {
   const editId = document.getElementById('editId').value;
   const payload = {
     name, desc, mcVer,
-    videoUrl:  document.getElementById('fVideoUrl').value.trim(),
-    packVer:   document.getElementById('fPackVer').value.trim(),
-    mods:      parseInt(document.getElementById('fMods').value) || 0,
-    status:    document.getElementById('fStatus').value,
-    year:      parseInt(document.getElementById('fYear').value) || new Date().getFullYear(),
-    tags:      [...currentTags],
-    colors:    [...selectedColors],
-    thumb:     thumbData || null,
+    videoUrl: document.getElementById('fVideoUrl').value.trim(),
+    packVer:  document.getElementById('fPackVer').value.trim(),
+    mods:     parseInt(document.getElementById('fMods').value) || 0,
+    status:   document.getElementById('fStatus').value,
+    year:     parseInt(document.getElementById('fYear').value) || new Date().getFullYear(),
+    tags:     [...currentTags],
+    colors:   [...selectedColors],
+    thumb:    thumbData || null,
   };
 
-  const saveBtn = document.querySelector('.form-actions .btn-primary');
+  const saveBtn = document.getElementById('savePackBtn');
   saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
 
   try {
@@ -1194,23 +1212,23 @@ async function savePack() {
       savedPack = await apiFetch('/packs', { method:'POST', body: JSON.stringify(payload) });
     }
 
-    // Handle files to delete (existing files removed from list)
+    // Delete files removed by user
     if (editId) {
       const original = packsCache.find(p => p.id === parseInt(editId));
-      const origNames = (original?.files||[]).map(f => f.name);
-      const keptNames = packFiles.map(f => f.name);
-      for (const name of origNames) {
-        if (!keptNames.includes(name)) {
-          await apiFetch(`/packs/${savedPack.id}/files/${encodeURIComponent(name)}`, { method:'DELETE' });
+      const keptNames = existingFiles.map(f => f.name);
+      for (const f of (original?.files || [])) {
+        if (!keptNames.includes(f.name)) {
+          await apiFetch(`/packs/${savedPack.id}/files/${encodeURIComponent(f.name)}`, { method: 'DELETE' });
         }
       }
     }
 
-    // Upload new files
-    if (newFileQueue.length) {
+    // Upload new file to Internet Archive (may take a moment)
+    if (packFile) {
+      saveBtn.textContent = 'Uploading to Archive.org…';
       const form = new FormData();
-      newFileQueue.forEach((f, i) => form.append(`file_${i}`, f, f.name));
-      await apiFetch(`/packs/${savedPack.id}/files`, { method:'POST', body: form });
+      form.append('file_0', packFile, packFile.name);
+      await apiFetch(`/packs/${savedPack.id}/files`, { method: 'POST', body: form });
     }
 
     await loadPacks();
