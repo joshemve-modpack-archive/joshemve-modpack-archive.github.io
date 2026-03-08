@@ -352,6 +352,20 @@
   .top-pack-row:last-child { border-bottom:none; }
   .top-pack-rank { font-family:'Space Mono',monospace; font-size:0.68rem; color:var(--text-dim); width:20px; flex-shrink:0; }
   .top-pack-name { flex:1; font-size:0.85rem; font-weight:500; }
+  .chart-range-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.25rem 0.6rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chart-range-btn:hover  { border-color: var(--text-dim); color: var(--text); }
+  .chart-range-btn.active { background: rgba(126,255,106,0.1); border-color: var(--accent); color: var(--accent); }
+
   .top-pack-bar-wrap { flex:2; background:var(--surface2); border-radius:100px; height:6px; overflow:hidden; }
   .top-pack-bar { height:100%; background:var(--accent); border-radius:100px; }
   .top-pack-count { font-family:'Space Mono',monospace; font-size:0.68rem; color:var(--text-muted); width:40px; text-align:right; flex-shrink:0; }
@@ -767,11 +781,19 @@
 
         <!-- Chart -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem;margin-bottom:2rem;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
-            <div style="font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);">// Visits &amp; Likes — Last 30 Days</div>
-            <div style="display:flex;gap:1rem;font-size:0.7rem;font-family:'Space Mono',monospace;">
-              <span style="display:flex;align-items:center;gap:0.35rem;color:var(--accent);"><span style="display:inline-block;width:18px;height:2px;background:var(--accent);border-radius:2px;"></span>Visits</span>
-              <span style="display:flex;align-items:center;gap:0.35rem;color:#ff6b6b;"><span style="display:inline-block;width:18px;height:2px;background:#ff6b6b;border-radius:2px;"></span>Likes</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
+            <div style="display:flex;align-items:center;gap:1.25rem;">
+              <div style="font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);" id="chartTitle">// Visits &amp; Likes</div>
+              <div style="display:flex;gap:0.5rem;font-size:0.7rem;font-family:'Space Mono',monospace;">
+                <span style="display:flex;align-items:center;gap:0.35rem;color:var(--accent);"><span style="display:inline-block;width:14px;height:2px;background:var(--accent);border-radius:2px;"></span>Visits</span>
+                <span style="display:flex;align-items:center;gap:0.35rem;color:#ff6b6b;"><span style="display:inline-block;width:14px;height:2px;background:#ff6b6b;border-radius:2px;"></span>Likes</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:0.35rem;" id="chartRangeBtns">
+              <button onclick="setChartRange(7)"  class="chart-range-btn" data-range="7">7d</button>
+              <button onclick="setChartRange(14)" class="chart-range-btn" data-range="14">14d</button>
+              <button onclick="setChartRange(30)" class="chart-range-btn active" data-range="30">30d</button>
+              <button onclick="setChartRange(90)" class="chart-range-btn" data-range="90">90d</button>
             </div>
           </div>
           <div id="analyticsChart" style="position:relative;height:140px;"></div>
@@ -1350,7 +1372,7 @@ async function savePack() {
 // ── ANALYTICS ─────────────────────────────────────────────────────────────
 async function loadAnalytics() {
   try {
-    const data = await apiFetch('/analytics');
+    const data = await apiFetch(`/analytics?days=${_chartRange}`);
 
     document.getElementById('aVisits').textContent    = data.total_visits.toLocaleString();
     document.getElementById('aUnique').textContent    = data.unique_visitors.toLocaleString();
@@ -1364,9 +1386,24 @@ async function loadAnalytics() {
   }
 }
 
+// Chart state
+let _chartDaily = [], _chartDailyLikes = [], _chartRange = 30;
+
+function setChartRange(days) {
+  _chartRange = days;
+  document.querySelectorAll('.chart-range-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.range) === days);
+  });
+  loadAnalytics();
+}
+
 function renderAnalyticsChart(daily, dailyLikes) {
+  _chartDaily = daily;
+  _chartDailyLikes = dailyLikes;
+
+  const N = _chartRange;
   const days = [];
-  for (let i = 29; i >= 0; i--) {
+  for (let i = N - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0,10);
     const v = daily.find(r => r.day === key);
@@ -1374,9 +1411,9 @@ function renderAnalyticsChart(daily, dailyLikes) {
     days.push({ day: key, visits: v ? v.count : 0, likes: l ? l.count : 0 });
   }
 
-  const W = 600, H = 120, PX = 4, PY = 8;
+  const W = 600, H = 120, PX = 4, PY = 10;
   const max = Math.max(...days.map(d => Math.max(d.visits, d.likes)), 1);
-  const xStep = (W - PX*2) / (days.length - 1);
+  const xStep = (W - PX*2) / Math.max(days.length - 1, 1);
 
   function pts(key) {
     return days.map((d, i) => [
@@ -1389,20 +1426,16 @@ function renderAnalyticsChart(daily, dailyLikes) {
     const p = pts(key);
     const linePath = p.map((pt, i) => (i===0?'M':'L') + pt[0].toFixed(2)+','+pt[1].toFixed(2)).join(' ');
     const fillPath = linePath + ` L${p[p.length-1][0].toFixed(2)},${H} L${p[0][0].toFixed(2)},${H} Z`;
-    const dots = p.map((pt, i) =>
-      `<circle data-x="${pt[0].toFixed(2)}" data-y="${pt[1].toFixed(2)}"
-        data-day="${days[i].day}" data-visits="${days[i].visits}" data-likes="${days[i].likes}"
-        r="3.5" fill="${color}" stroke="var(--bg)" stroke-width="1.5"
-        opacity="0" class="chart-dot"></circle>`
-    ).join('');
-    return { linePath, fillPath, dots, color };
+    return { linePath, fillPath, color };
   }
 
   const chart = document.getElementById('analyticsChart');
+  const visitPts = pts('visits');
+  const likesPts = pts('likes');
   const lines = [buildLine('visits','#7eff6a'), buildLine('likes','#ff6b6b')];
 
   chart.innerHTML = `
-    <div style="position:relative;width:100%;height:140px;">
+    <div style="position:relative;width:100%;height:140px;cursor:crosshair;" id="chartWrap">
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
         style="position:absolute;inset:0;width:100%;height:100%;">
         <defs>
@@ -1418,63 +1451,107 @@ function renderAnalyticsChart(daily, dailyLikes) {
             stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
         `).join('')}
       </svg>
-      <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;" id="chartDots">
-        ${lines.map(l => `<g>${l.dots}</g>`).join('')}
+
+      <!-- Crosshair + dots overlay (not scaled) -->
+      <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;" id="chartOverlay">
+        <!-- Vertical crosshair line -->
+        <line id="chartCrosshair" x1="0" y1="0" x2="0" y2="140"
+          stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>
+        <!-- Visit dot -->
+        <circle id="chartDotVisit" r="4" fill="#7eff6a" stroke="var(--bg)" stroke-width="1.5" opacity="0"/>
+        <!-- Likes dot -->
+        <circle id="chartDotLike"  r="4" fill="#ff6b6b" stroke="var(--bg)" stroke-width="1.5" opacity="0"/>
       </svg>
+
+      <!-- Invisible mouse-tracking layer -->
+      <div id="chartMouseArea" style="position:absolute;inset:0;"></div>
+
+      <!-- Tooltip -->
       <div id="chartTooltip" style="
-        position:absolute;pointer-events:none;opacity:0;transition:opacity 0.12s;
+        position:absolute;pointer-events:none;opacity:0;transition:opacity 0.1s;
         background:var(--surface);border:1px solid var(--border);border-radius:8px;
-        padding:0.45rem 0.7rem;font-family:'Space Mono',monospace;
-        white-space:nowrap;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,0.45);
+        padding:0.5rem 0.75rem;font-family:'Space Mono',monospace;
+        white-space:nowrap;z-index:10;box-shadow:0 4px 24px rgba(0,0,0,0.5);
       ">
-        <div id="chartTipDay" style="color:var(--text-dim);font-size:0.62rem;margin-bottom:0.25rem;"></div>
-        <div style="display:flex;gap:0.7rem;font-size:0.72rem;">
+        <div id="chartTipDay" style="color:var(--text-dim);font-size:0.62rem;margin-bottom:0.3rem;border-bottom:1px solid var(--border);padding-bottom:0.25rem;"></div>
+        <div style="display:flex;flex-direction:column;gap:0.2rem;font-size:0.72rem;">
           <span id="chartTipVisits" style="color:#7eff6a;"></span>
           <span id="chartTipLikes"  style="color:#ff6b6b;"></span>
         </div>
       </div>
     </div>`;
 
+  // Wire up mouse tracking after render
   requestAnimationFrame(() => {
-    const container = chart.querySelector('#chartDots');
+    const wrap      = chart.querySelector('#chartWrap');
+    const overlay   = chart.querySelector('#chartOverlay');
+    const mouseArea = chart.querySelector('#chartMouseArea');
     const tooltip   = chart.querySelector('#chartTooltip');
-    const wrapRect  = chart.querySelector('div').getBoundingClientRect();
-    const rect      = container.getBoundingClientRect();
+    const crosshair = chart.querySelector('#chartCrosshair');
+    const dotV      = chart.querySelector('#chartDotVisit');
+    const dotL      = chart.querySelector('#chartDotLike');
 
-    container.querySelectorAll('.chart-dot').forEach(dot => {
-      const px = parseFloat(dot.dataset.x) / W * rect.width;
-      const py = parseFloat(dot.dataset.y) / H * rect.height;
-      dot.setAttribute('cx', px);
-      dot.setAttribute('cy', py);
+    const rect = wrap.getBoundingClientRect();
+    const W_px = rect.width;
+    const H_px = rect.height;
 
-      dot.addEventListener('mouseenter', () => {
-        container.querySelectorAll('.chart-dot').forEach(d => d.setAttribute('opacity','1'));
-        dot.setAttribute('r','5');
-        chart.querySelector('#chartTipDay').textContent    = dot.dataset.day;
-        chart.querySelector('#chartTipVisits').textContent = '↑ ' + dot.dataset.visits + ' views';
-        chart.querySelector('#chartTipLikes').textContent  = '♥ ' + dot.dataset.likes  + ' likes';
-        // Position tooltip above the dot, clamped inside chart
-        const tipW = 130, tipH = 52;
-        let left = px - tipW/2;
-        let top  = py - tipH - 10;
-        if (left < 4) left = 4;
-        if (left + tipW > rect.width - 4) left = rect.width - tipW - 4;
-        if (top < 4) top = py + 14;
-        tooltip.style.left    = left + 'px';
-        tooltip.style.top     = top  + 'px';
-        tooltip.style.opacity = '1';
-      });
-      dot.addEventListener('mouseleave', () => {
-        dot.setAttribute('r','3.5');
-        tooltip.style.opacity = '0';
-        container.querySelectorAll('.chart-dot').forEach(d => d.setAttribute('opacity','0'));
-      });
+    // Pre-compute pixel positions of all data points
+    const vPts = visitPts.map(p => [p[0]/W*W_px, p[1]/H*H_px]);
+    const lPts = likesPts.map(p => [p[0]/W*W_px, p[1]/H*H_px]);
+
+    function showForIndex(idx) {
+      if (idx < 0 || idx >= days.length) return;
+      const d   = days[idx];
+      const vpx = vPts[idx][0], vpy = vPts[idx][1];
+      const lpx = lPts[idx][0], lpy = lPts[idx][1];
+
+      // Crosshair
+      crosshair.setAttribute('x1', vpx); crosshair.setAttribute('x2', vpx);
+      crosshair.setAttribute('y2', H_px);
+      crosshair.setAttribute('opacity','1');
+
+      // Dots
+      dotV.setAttribute('cx', vpx); dotV.setAttribute('cy', vpy); dotV.setAttribute('opacity','1');
+      dotL.setAttribute('cx', lpx); dotL.setAttribute('cy', lpy); dotL.setAttribute('opacity','1');
+
+      // Tooltip content
+      chart.querySelector('#chartTipDay').textContent    = d.day;
+      chart.querySelector('#chartTipVisits').textContent = '↑ ' + d.visits + ' visits';
+      chart.querySelector('#chartTipLikes').textContent  = '♥ ' + d.likes  + ' likes';
+
+      // Tooltip position — above crosshair, clamped
+      const tipW = 148, tipH = 72;
+      let tx = vpx - tipW/2;
+      let ty = Math.min(vpy, lpy) - tipH - 10;
+      if (tx < 4) tx = 4;
+      if (tx + tipW > W_px - 4) tx = W_px - tipW - 4;
+      if (ty < 4) ty = Math.min(vpy, lpy) + 12;
+      tooltip.style.left    = tx + 'px';
+      tooltip.style.top     = ty + 'px';
+      tooltip.style.opacity = '1';
+    }
+
+    function hide() {
+      crosshair.setAttribute('opacity','0');
+      dotV.setAttribute('opacity','0');
+      dotL.setAttribute('opacity','0');
+      tooltip.style.opacity = '0';
+    }
+
+    mouseArea.addEventListener('mousemove', e => {
+      const mx = e.clientX - wrap.getBoundingClientRect().left;
+      // Snap to nearest data point
+      const idx = Math.min(Math.max(Math.round((mx - vPts[0][0]) / (W_px / (days.length-1||1))), 0), days.length-1);
+      showForIndex(idx);
     });
+    mouseArea.addEventListener('mouseleave', hide);
   });
 
+  // Labels
   const labels = document.getElementById('analyticsChartLabels');
+  const step = N <= 7 ? 1 : N <= 14 ? 2 : N <= 30 ? 5 : 10;
   labels.innerHTML = days.map((d, i) => {
-    const show = i === 0 || i === 29 || d.day.endsWith('-01');
+    const show = i === 0 || i === days.length-1 || i % step === 0;
     return `<span style="flex:1;text-align:center;">${show ? d.day.slice(5) : ''}</span>`;
   }).join('');
 }
