@@ -5,8 +5,8 @@
 <meta name="google-site-verification" content="l47VnqAl0mN8yVZA769zWHIDNsk53Tiu3Qyd4GiQafM" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JMA - Pack</title>
-  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -146,6 +146,77 @@
 
     /* ── LEFT COLUMN ── */
     .pack-section { margin-bottom: 2rem; }
+
+    .gallery-strip {
+      display: flex;
+      gap: 0.6rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .gallery-strip::-webkit-scrollbar { height: 4px; }
+    .gallery-strip::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .gallery-thumb {
+      flex-shrink: 0;
+      width: 220px;
+      height: 124px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.2s;
+      position: relative;
+    }
+    .gallery-thumb:hover { border-color: rgba(126,255,106,0.4); transform: translateY(-2px); }
+    .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gallery-thumb-caption {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.75));
+      color: rgba(255,255,255,0.85);
+      font-size: 0.65rem;
+      padding: 0.6rem 0.5rem 0.35rem;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    /* Lightbox */
+    .gallery-lightbox {
+      position: fixed; inset: 0; z-index: 600;
+      background: rgba(0,0,0,0.9);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .gallery-lightbox.open { opacity: 1; pointer-events: all; }
+    .gallery-lightbox img {
+      max-width: 92vw; max-height: 88vh;
+      border-radius: 10px;
+      box-shadow: 0 20px 80px rgba(0,0,0,0.8);
+      object-fit: contain;
+    }
+    .gallery-lb-close {
+      position: absolute; top: 1.25rem; right: 1.5rem;
+      background: none; border: none; color: rgba(255,255,255,0.6);
+      font-size: 1.75rem; cursor: pointer; line-height: 1;
+      transition: color 0.15s;
+    }
+    .gallery-lb-close:hover { color: #fff; }
+    .gallery-lb-prev, .gallery-lb-next {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.7); border-radius: 8px;
+      font-size: 1.25rem; padding: 0.6rem 0.9rem; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .gallery-lb-prev:hover, .gallery-lb-next:hover {
+      background: rgba(255,255,255,0.15); color: #fff;
+    }
+    .gallery-lb-prev { left: 1.25rem; }
+    .gallery-lb-next { right: 1.25rem; }
+    .gallery-lb-caption {
+      position: absolute; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+      color: rgba(255,255,255,0.6); font-size: 0.78rem;
+      font-family: 'Outfit', sans-serif; white-space: nowrap;
+    }
     .section-label {
       font-family: 'Space Mono', monospace;
       font-size: 0.62rem; color: var(--accent);
@@ -851,6 +922,18 @@
               <p class="pack-desc">${p.desc}</p>
             </div>` : ''}
 
+            ${p.gallery?.length ? `
+            <div class="pack-section">
+              <div class="section-label">Screenshots</div>
+              <div class="gallery-strip">
+                ${p.gallery.map((img, i) => `
+                  <div class="gallery-thumb" onclick="openLightbox(${JSON.stringify(p.gallery).replace(/"/g,'&quot;')}, ${i})">
+                    <img src="${img.image}" alt="${img.caption || 'screenshot ' + (i+1)}" loading="lazy">
+                    ${img.caption ? `<div class="gallery-thumb-caption">${img.caption}</div>` : ''}
+                  </div>`).join('')}
+              </div>
+            </div>` : ''}
+
             <div class="pack-section">
               <div class="section-label">Details</div>
               ${statsHtml}
@@ -885,6 +968,40 @@
       `linear-gradient(135deg, ${c0} 0%, ${darken(c1)} 100%)`;
   }
 
+
+  // ── GALLERY LIGHTBOX ──────────────────────────────────────────────────────
+  let _gallery = [], _lbIdx = 0;
+
+  function openLightbox(gallery, idx) {
+    _gallery = gallery; _lbIdx = idx;
+    lbRender();
+    document.getElementById('galleryLightbox').classList.add('open');
+  }
+  function closeLightbox() {
+    document.getElementById('galleryLightbox').classList.remove('open');
+  }
+  function lbClose(e) {
+    if (e.target === document.getElementById('galleryLightbox')) closeLightbox();
+  }
+  function lbNav(dir) {
+    _lbIdx = (_lbIdx + dir + _gallery.length) % _gallery.length;
+    lbRender();
+  }
+  function lbRender() {
+    const img = _gallery[_lbIdx];
+    document.getElementById('lbImg').src          = img.image;
+    document.getElementById('lbCaption').textContent = img.caption || '';
+    // hide arrows if only one image
+    document.querySelector('.gallery-lb-prev').style.display = _gallery.length > 1 ? '' : 'none';
+    document.querySelector('.gallery-lb-next').style.display = _gallery.length > 1 ? '' : 'none';
+  }
+  document.addEventListener('keydown', e => {
+    const lb = document.getElementById('galleryLightbox');
+    if (!lb.classList.contains('open')) return;
+    if (e.key === 'Escape')      closeLightbox();
+    if (e.key === 'ArrowLeft')   lbNav(-1);
+    if (e.key === 'ArrowRight')  lbNav(1);
+  });
 
   // ── LIKE & SHARE ──────────────────────────────────────────────────────────
   let currentPackId = null;
@@ -982,6 +1099,15 @@
 
   init();
 </script>
+<!-- Gallery lightbox -->
+<div class="gallery-lightbox" id="galleryLightbox" onclick="lbClose(event)">
+  <button class="gallery-lb-close" onclick="closeLightbox()">×</button>
+  <button class="gallery-lb-prev" onclick="lbNav(-1);event.stopPropagation()">‹</button>
+  <img id="lbImg" src="" alt="">
+  <button class="gallery-lb-next" onclick="lbNav(1);event.stopPropagation()">›</button>
+  <div class="gallery-lb-caption" id="lbCaption"></div>
+</div>
+
 <!-- Share popup -->
 <div class="share-overlay" id="shareOverlay" onclick="closeShare(event)">
   <div class="share-popup">
