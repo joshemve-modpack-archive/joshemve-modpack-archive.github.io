@@ -907,15 +907,25 @@
             </div>
             <!-- Pack file registration -->
             <div class="form-group full">
-              <label class="form-label">Pack Files — from Internet Archive</label>
-              <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:0.75rem;line-height:1.6;padding:0.75rem 1rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
-                📦 Upload your file at <a href="https://archive.org/upload" target="_blank" style="color:var(--accent3)">archive.org/upload</a>, then paste the direct download URL below.<br>
-                Direct URLs look like: <code style="color:var(--accent);font-size:0.7rem;">https://archive.org/download/your-item/yourfile.zip</code>
-              </div>
+              <label class="form-label">Pack Files</label>
               <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.75rem;">
-                <textarea id="iaUrlInput" rows="3" placeholder="Paste one or more URLs, one per line:&#10;https://archive.org/download/item/file1.zip&#10;https://archive.org/download/item/file2.mrpack"
-                  style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1rem;color:var(--text);font-family:'Outfit',sans-serif;font-size:0.82rem;outline:none;resize:vertical;line-height:1.6;"></textarea>
-                <button class="btn-ghost" onclick="addIAFile()" style="align-self:flex-end;padding:0.55rem 1.2rem;">+ Add URLs</button>
+                <div style="display:flex;gap:0.5rem;align-items:flex-start;">
+                  <textarea id="iaUrlInput" rows="3" placeholder="Paste one or more URLs, one per line:&#10;https://cdn.modrinth.com/.../file.mrpack&#10;https://mediafilez.forgecdn.net/.../file.zip"
+                    style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1rem;color:var(--text);font-family:'Outfit',sans-serif;font-size:0.82rem;outline:none;resize:vertical;line-height:1.6;"></textarea>
+                  <div style="display:flex;flex-direction:column;gap:0.4rem;min-width:140px;">
+                    <input id="iaLabelInput" type="text" placeholder="Label (optional)"
+                      style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.65rem 0.85rem;color:var(--text);font-family:'Outfit',sans-serif;font-size:0.82rem;outline:none;"
+                      list="labelSuggestions">
+                    <datalist id="labelSuggestions">
+                      <option value="Mods">
+                      <option value="Map">
+                      <option value="Resource Pack">
+                      <option value="Config">
+                      <option value="Extras">
+                    </datalist>
+                    <button class="btn-ghost" onclick="addIAFile()" style="padding:0.55rem 1rem;">+ Add</button>
+                  </div>
+                </div>
               </div>
               <div class="file-list" id="packFileList"></div>
             </div>
@@ -1187,16 +1197,17 @@ let existingFiles = []; // files already registered for this pack
 
 function addIAFile() {
   const input = document.getElementById('iaUrlInput');
+  const label = (document.getElementById('iaLabelInput').value || '').trim();
   const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
   if (!lines.length) return;
 
   let added = 0, dupes = 0, invalid = 0;
   for (const url of lines) {
-    if (!url.startsWith('https://archive.org/download/')) { invalid++; continue; }
-    const name = decodeURIComponent(url.split('/').pop());
-    if (!name) { invalid++; continue; }
+    if (!url.startsWith('https://')) { invalid++; continue; }
+    const name = decodeURIComponent(url.split('/').pop().split('?')[0]);
+    if (!name || !name.includes('.')) { invalid++; continue; }
     if (pendingFiles.some(f => f.url === url) || existingFiles.some(f => f.url === url)) { dupes++; continue; }
-    pendingFiles.push({ name, url, size: 0 });
+    pendingFiles.push({ name, url, size: 0, label });
     added++;
   }
 
@@ -1222,25 +1233,31 @@ function renderPackFileList() {
   const list = document.getElementById('packFileList');
   let html   = '';
 
-  existingFiles.forEach(f => {
+  existingFiles.forEach((f, i) => {
     const ext = f.name.split('.').pop().toUpperCase();
     html += `<div class="file-item">
-      <div class="file-item-left">
+      <div class="file-item-left" style="flex:1;gap:0.5rem;">
         <span class="file-ext">${ext}</span>
-        <span class="file-name">${f.name}</span>
-        <span class="file-size"><a href="${f.url}" target="_blank" style="color:var(--accent3)">on IA ↗</a></span>
+        <span class="file-name" style="flex:1;">${f.name}</span>
+        <input type="text" value="${f.label||''}" placeholder="label"
+          style="width:110px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;color:var(--text);font-family:'Outfit',sans-serif;outline:none;"
+          onchange="existingFiles[${i}].label=this.value">
+        <a href="${f.url}" target="_blank" style="color:var(--accent3);font-size:0.7rem;">↗</a>
       </div>
       <button class="file-remove" onclick="removeExistingFile('${f.name.replace(/'/g,"\'")}')">×</button>
     </div>`;
   });
 
-  pendingFiles.forEach(f => {
+  pendingFiles.forEach((f, i) => {
     const ext = f.name.split('.').pop().toUpperCase();
     html += `<div class="file-item">
-      <div class="file-item-left">
+      <div class="file-item-left" style="flex:1;gap:0.5rem;">
         <span class="file-ext">${ext}</span>
-        <span class="file-name">${f.name}</span>
-        <span class="file-size"><span style="color:var(--accent);font-size:0.6rem;">NEW</span></span>
+        <span class="file-name" style="flex:1;">${f.name}</span>
+        <input type="text" value="${f.label||''}" placeholder="label"
+          style="width:110px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;color:var(--text);font-family:'Outfit',sans-serif;outline:none;"
+          onchange="pendingFiles[${i}].label=this.value">
+        <span style="color:var(--accent);font-size:0.6rem;">NEW</span>
       </div>
       <button class="file-remove" onclick="removePendingFile('${f.url.replace(/'/g,"\'")}')">×</button>
     </div>`;
