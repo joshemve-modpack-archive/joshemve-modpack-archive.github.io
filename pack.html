@@ -922,17 +922,19 @@
               <p class="pack-desc">${p.desc}</p>
             </div>` : ''}
 
-            ${p.gallery?.length ? `
-            <div class="pack-section">
+            ${p.gallery?.length ? (() => {
+              window._packGallery = p.gallery;
+              return `<div class="pack-section">
               <div class="section-label">Images</div>
-              <div class="gallery-strip">
+              <div class="gallery-strip" id="galleryStrip">
                 ${p.gallery.map((img, i) => `
-                  <div class="gallery-thumb" onclick="openLightbox(${JSON.stringify(p.gallery).replace(/"/g,'&quot;')}, ${i})">
-                    <img src="${img.image}" alt="${img.caption || 'screenshot ' + (i+1)}" loading="lazy">
+                  <div class="gallery-thumb" data-idx="${i}">
+                    <img src="${img.image}" alt="${img.caption || 'image ' + (i+1)}" loading="lazy">
                     ${img.caption ? `<div class="gallery-thumb-caption">${img.caption}</div>` : ''}
                   </div>`).join('')}
               </div>
-            </div>` : ''}
+            </div>`;
+            })() : ''}
 
             <div class="pack-section">
               <div class="section-label">Details</div>
@@ -972,8 +974,8 @@
   // ── GALLERY LIGHTBOX ──────────────────────────────────────────────────────
   let _gallery = [], _lbIdx = 0;
 
-  function openLightbox(gallery, idx) {
-    _gallery = gallery; _lbIdx = idx;
+  function openLightbox(idx) {
+    _gallery = window._packGallery || []; _lbIdx = idx;
     lbRender();
     document.getElementById('galleryLightbox').classList.add('open');
   }
@@ -1092,6 +1094,16 @@
       currentPackId = pack.id;
       renderPack(pack, allPacks);
       loadLikes(pack.id);
+      // Wire gallery thumbs via event delegation (avoids inline JSON issues)
+      requestAnimationFrame(() => {
+        const strip = document.getElementById('galleryStrip');
+        if (strip) {
+          strip.addEventListener('click', e => {
+            const thumb = e.target.closest('.gallery-thumb');
+            if (thumb) openLightbox(parseInt(thumb.dataset.idx));
+          });
+        }
+      });
     } catch (e) {
       renderError('Pack not found or failed to load.');
     }
