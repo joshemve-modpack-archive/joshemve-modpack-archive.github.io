@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="google-site-verification" content="l47VnqAl0mN8yVZA769zWHIDNsk53Tiu3Qyd4GiQafM" />
+<meta name="google-site-verification" content="l47VnqAl0mN8yVZA769zWHIDNsk53Tiu3Qyd4GiQafM" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JMA - Pack</title>
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
@@ -237,6 +237,29 @@
       margin-top: 0.2rem;
     }
     .dl-card-files { padding: 0.6rem 0.8rem; }
+    .dl-file-group-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      padding: 0.6rem 0.8rem 0.25rem;
+      border-top: 1px solid var(--border);
+      margin-top: 0.25rem;
+    }
+    .dl-file-group-label:first-child { border-top: none; margin-top: 0; }
+    .dl-file-label-badge {
+      font-size: 0.58rem;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.1rem 0.4rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
     .dl-file {
       display: flex; align-items: center; gap: 0.7rem;
       padding: 0.65rem 0.6rem;
@@ -703,21 +726,39 @@
 
     // Download card files
     const extColors = {ZIP:'#ff6b35',MRPACK:'#7eff6a',JAR:'#4db8ff',RAR:'#ff6b35','7Z':'#ff6b35',GZ:'#ff6b35'};
-    const filesHtml = p.files?.length
-      ? p.files.map(f => {
-          const ext   = f.name.split('.').pop().toUpperCase();
-          const color = extColors[ext] || '#7a7f8e';
-          const base  = f.name.replace(/\.[^.]+$/, '');
-          return `<a class="dl-file" href="${f.url}" target="_blank" rel="noopener" title="${f.name}" onclick="track('download',{pack_id:${p.id}})">
-            <div class="dl-file-icon" style="background:${color}22;border:1px solid ${color}44;color:${color};">${ext}</div>
-            <div class="dl-file-info">
-              <div class="dl-file-name">${base}</div>
-              <div class="dl-file-size">archive.org ↗</div>
-            </div>
-            <div class="dl-file-arrow">↓</div>
-          </a>`;
-        }).join('')
-      : `<div class="dl-no-files">// no files yet</div>`;
+    const filesHtml = (() => {
+      if (!p.files?.length) return `<div class="dl-no-files">// no files yet</div>`;
+
+      // Group files: labelled files grouped under their label, unlabelled files first
+      const unlabelled = p.files.filter(f => !f.label);
+      const labelMap   = {};
+      p.files.filter(f => f.label).forEach(f => {
+        if (!labelMap[f.label]) labelMap[f.label] = [];
+        labelMap[f.label].push(f);
+      });
+
+      function fileRow(f) {
+        const ext   = f.name.split('.').pop().toUpperCase();
+        const color = extColors[ext] || '#7a7f8e';
+        const base  = f.name.replace(/\.[^.]+$/, '');
+        const host  = (() => { try { return new URL(f.url).hostname.replace('www.',''); } catch(e) { return '↗'; } })();
+        return `<a class="dl-file" href="${f.url}" target="_blank" rel="noopener" title="${f.name}" onclick="track('download',{pack_id:${p.id}})">
+          <div class="dl-file-icon" style="background:${color}22;border:1px solid ${color}44;color:${color};">${ext}</div>
+          <div class="dl-file-info">
+            <div class="dl-file-name">${base}</div>
+            <div class="dl-file-size">${host}</div>
+          </div>
+          <div class="dl-file-arrow">↓</div>
+        </a>`;
+      }
+
+      let html = unlabelled.map(fileRow).join('');
+      Object.entries(labelMap).forEach(([label, files]) => {
+        html += `<div class="dl-file-group-label">${label}</div>`;
+        html += files.map(fileRow).join('');
+      });
+      return html;
+    })();
 
     const watchBtnHtml = p.videoUrl
       ? `<a class="btn-watch" href="${p.videoUrl}" target="_blank" rel="noopener">
