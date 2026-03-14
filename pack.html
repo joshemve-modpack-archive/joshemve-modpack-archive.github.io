@@ -5,8 +5,8 @@
 <meta name="google-site-verification" content="l47VnqAl0mN8yVZA769zWHIDNsk53Tiu3Qyd4GiQafM" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JMA - Pack</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -313,7 +313,7 @@
       font-size: 0.65rem;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: var(--text-dim);
+      color: var(--text-muted);
       padding: 0.6rem 0.8rem 0.25rem;
       border-top: 1px solid var(--border);
       margin-top: 0.25rem;
@@ -924,7 +924,7 @@
 
             ${p.gallery?.length ? `
             <div class="pack-section">
-              <div class="section-label">Screenshots</div>
+              <div class="section-label">Images</div>
               <div class="gallery-strip">
                 ${p.gallery.map((img, i) => `
                   <div class="gallery-thumb" onclick="openLightbox(${JSON.stringify(p.gallery).replace(/"/g,'&quot;')}, ${i})">
