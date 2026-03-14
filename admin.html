@@ -1306,7 +1306,7 @@ function editPack(id) {
   document.getElementById('fStatus').value      = p.status || 'active';
   document.getElementById('fYear').value        = p.year || '';
   pendingFiles = [];
-  existingFiles = (p.files || []);
+  existingFiles = (p.files || []).map(f => ({ name: f.name, url: f.url, size: f.size || 0, label: f.label || "" }));
   renderPackFileList();
   currentTags = [...(p.tags||[])]; renderTags();
   selectedColors = p.colors ? [...p.colors] : ['#333','#444','#555','#333'];
@@ -1361,13 +1361,23 @@ async function savePack() {
       }
     }
 
-    // Register any new IA URLs in the DB
+    // Register any new files
     if (pendingFiles.length) {
       saveBtn.textContent = 'Registering files…';
       for (const f of pendingFiles) {
         await apiFetch(`/packs/${savedPack.id}/files/register`, {
           method: 'POST',
-          body: JSON.stringify({ name: f.name, url: f.url, size: 0, mime_type: '' }),
+          body: JSON.stringify({ name: f.name, url: f.url, size: 0, mime_type: '', label: f.label || '' }),
+        });
+      }
+    }
+
+    // Update labels on existing files
+    if (editId && existingFiles.length) {
+      for (const f of existingFiles) {
+        await apiFetch(`/packs/${savedPack.id}/files/${encodeURIComponent(f.name)}/label`, {
+          method: 'PATCH',
+          body: JSON.stringify({ label: f.label || '' }),
         });
       }
     }
