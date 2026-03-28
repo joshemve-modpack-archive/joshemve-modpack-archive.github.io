@@ -827,9 +827,10 @@
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem;margin-bottom:2rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
             <div style="display:flex;align-items:center;gap:1.25rem;">
-              <div style="font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);" id="chartTitle">// Visits &amp; Likes</div>
+              <div style="font-size:0.72rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);" id="chartTitle">// Visits, Downloads &amp; Likes</div>
               <div style="display:flex;gap:0.5rem;font-size:0.7rem;font-family:'Space Mono',monospace;">
                 <span style="display:flex;align-items:center;gap:0.35rem;color:var(--accent);"><span style="display:inline-block;width:14px;height:2px;background:var(--accent);border-radius:2px;"></span>Visits</span>
+                <span style="display:flex;align-items:center;gap:0.35rem;color:#4db8ff;"><span style="display:inline-block;width:14px;height:2px;background:#4db8ff;border-radius:2px;"></span>Downloads</span>
                 <span style="display:flex;align-items:center;gap:0.35rem;color:#ff6b6b;"><span style="display:inline-block;width:14px;height:2px;background:#ff6b6b;border-radius:2px;"></span>Likes</span>
               </div>
             </div>
@@ -1530,7 +1531,7 @@ async function loadAnalytics() {
     document.getElementById('aDownloads').textContent = data.total_downloads.toLocaleString();
     document.getElementById('aLikes').textContent     = (data.total_likes || 0).toLocaleString();
 
-    renderAnalyticsChart(data.daily, data.daily_likes || []);
+    renderAnalyticsChart(data.daily, data.daily_downloads || [], data.daily_likes || []);
     renderTopPacks(data.top_packs, data.most_liked || []);
   } catch(e) {
     showToast('Failed to load analytics: ' + e.message, true);
@@ -1538,7 +1539,7 @@ async function loadAnalytics() {
 }
 
 // Chart state
-let _chartDaily = [], _chartDailyLikes = [], _chartRange = 30;
+let _chartDaily = [], _chartDailyDownloads = [], _chartDailyLikes = [], _chartRange = 30;
 
 function setChartRange(days) {
   _chartRange = days;
@@ -1548,8 +1549,9 @@ function setChartRange(days) {
   loadAnalytics();
 }
 
-function renderAnalyticsChart(daily, dailyLikes) {
+function renderAnalyticsChart(daily, dailyDownloads, dailyLikes) {
   _chartDaily = daily;
+  _chartDailyDownloads = dailyDownloads;
   _chartDailyLikes = dailyLikes;
 
   const N = _chartRange;
@@ -1558,12 +1560,13 @@ function renderAnalyticsChart(daily, dailyLikes) {
     const d = new Date(); d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0,10);
     const v = daily.find(r => r.day === key);
+    const dl = dailyDownloads.find(r => r.day === key);
     const l = dailyLikes.find(r => r.day === key);
-    days.push({ day: key, visits: v ? v.count : 0, likes: l ? l.count : 0 });
+    days.push({ day: key, visits: v ? v.count : 0, downloads: dl ? dl.count : 0, likes: l ? l.count : 0 });
   }
 
   const W = 600, H = 120, PX = 4, PY = 10;
-  const max = Math.max(...days.map(d => Math.max(d.visits, d.likes)), 1);
+  const max = Math.max(...days.map(d => Math.max(d.visits, d.downloads, d.likes)), 1);
   const xStep = (W - PX*2) / Math.max(days.length - 1, 1);
 
   function pts(key) {
@@ -1582,8 +1585,13 @@ function renderAnalyticsChart(daily, dailyLikes) {
 
   const chart = document.getElementById('analyticsChart');
   const visitPts = pts('visits');
+  const downloadPts = pts('downloads');
   const likesPts = pts('likes');
-  const lines = [buildLine('visits','#7eff6a'), buildLine('likes','#ff6b6b')];
+  const lines = [
+    buildLine('visits','#7eff6a'),
+    buildLine('downloads','#4db8ff'),
+    buildLine('likes','#ff6b6b')
+  ];
 
   chart.innerHTML = `
     <div style="position:relative;width:100%;height:140px;cursor:crosshair;" id="chartWrap">
@@ -1610,6 +1618,8 @@ function renderAnalyticsChart(daily, dailyLikes) {
           stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>
         <!-- Visit dot -->
         <circle id="chartDotVisit" r="4" fill="#7eff6a" stroke="var(--bg)" stroke-width="1.5" opacity="0"/>
+        <!-- Download dot -->
+        <circle id="chartDotDownload" r="4" fill="#4db8ff" stroke="var(--bg)" stroke-width="1.5" opacity="0"/>
         <!-- Likes dot -->
         <circle id="chartDotLike"  r="4" fill="#ff6b6b" stroke="var(--bg)" stroke-width="1.5" opacity="0"/>
       </svg>
@@ -1627,6 +1637,7 @@ function renderAnalyticsChart(daily, dailyLikes) {
         <div id="chartTipDay" style="color:var(--text-dim);font-size:0.62rem;margin-bottom:0.3rem;border-bottom:1px solid var(--border);padding-bottom:0.25rem;"></div>
         <div style="display:flex;flex-direction:column;gap:0.2rem;font-size:0.72rem;">
           <span id="chartTipVisits" style="color:#7eff6a;"></span>
+          <span id="chartTipDownloads" style="color:#4db8ff;"></span>
           <span id="chartTipLikes"  style="color:#ff6b6b;"></span>
         </div>
       </div>
@@ -1640,6 +1651,7 @@ function renderAnalyticsChart(daily, dailyLikes) {
     const tooltip   = chart.querySelector('#chartTooltip');
     const crosshair = chart.querySelector('#chartCrosshair');
     const dotV      = chart.querySelector('#chartDotVisit');
+    const dotD      = chart.querySelector('#chartDotDownload');
     const dotL      = chart.querySelector('#chartDotLike');
 
     const rect = wrap.getBoundingClientRect();
@@ -1648,12 +1660,14 @@ function renderAnalyticsChart(daily, dailyLikes) {
 
     // Pre-compute pixel positions of all data points
     const vPts = visitPts.map(p => [p[0]/W*W_px, p[1]/H*H_px]);
+    const dPts = downloadPts.map(p => [p[0]/W*W_px, p[1]/H*H_px]);
     const lPts = likesPts.map(p => [p[0]/W*W_px, p[1]/H*H_px]);
 
     function showForIndex(idx) {
       if (idx < 0 || idx >= days.length) return;
       const d   = days[idx];
       const vpx = vPts[idx][0], vpy = vPts[idx][1];
+      const dpx = dPts[idx][0], dpy = dPts[idx][1];
       const lpx = lPts[idx][0], lpy = lPts[idx][1];
 
       // Crosshair
@@ -1663,20 +1677,22 @@ function renderAnalyticsChart(daily, dailyLikes) {
 
       // Dots
       dotV.setAttribute('cx', vpx); dotV.setAttribute('cy', vpy); dotV.setAttribute('opacity','1');
+      dotD.setAttribute('cx', dpx); dotD.setAttribute('cy', dpy); dotD.setAttribute('opacity','1');
       dotL.setAttribute('cx', lpx); dotL.setAttribute('cy', lpy); dotL.setAttribute('opacity','1');
 
       // Tooltip content
       chart.querySelector('#chartTipDay').textContent    = d.day;
       chart.querySelector('#chartTipVisits').textContent = '↑ ' + d.visits + ' visits';
+      chart.querySelector('#chartTipDownloads').textContent = '↓ ' + d.downloads + ' downloads';
       chart.querySelector('#chartTipLikes').textContent  = '♥ ' + d.likes  + ' likes';
 
       // Tooltip position — above crosshair, clamped
       const tipW = 148, tipH = 72;
       let tx = vpx - tipW/2;
-      let ty = Math.min(vpy, lpy) - tipH - 10;
+      let ty = Math.min(vpy, dpy, lpy) - tipH - 10;
       if (tx < 4) tx = 4;
       if (tx + tipW > W_px - 4) tx = W_px - tipW - 4;
-      if (ty < 4) ty = Math.min(vpy, lpy) + 12;
+      if (ty < 4) ty = Math.min(vpy, dpy, lpy) + 12;
       tooltip.style.left    = tx + 'px';
       tooltip.style.top     = ty + 'px';
       tooltip.style.opacity = '1';
@@ -1685,6 +1701,7 @@ function renderAnalyticsChart(daily, dailyLikes) {
     function hide() {
       crosshair.setAttribute('opacity','0');
       dotV.setAttribute('opacity','0');
+      dotD.setAttribute('opacity','0');
       dotL.setAttribute('opacity','0');
       tooltip.style.opacity = '0';
     }
