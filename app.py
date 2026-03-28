@@ -1,5 +1,6 @@
 """
 Joshemve Modpack Archive — Flask API Backend
+This gets run on pythonanywhere to host the backend
 """
 
 import os
