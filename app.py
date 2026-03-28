@@ -487,6 +487,12 @@ def get_analytics():
               AND ts >= datetime('now', :offset)
             GROUP BY day ORDER BY day ASC
         """, {"offset": f"-{days-1} days"}).fetchall()
+        daily_downloads = conn.execute("""
+            SELECT DATE(ts) as day, COUNT(*) as count
+            FROM events WHERE event_type='download'
+              AND ts >= datetime('now', :offset)
+            GROUP BY day ORDER BY day ASC
+        """, {"offset": f"-{days-1} days"}).fetchall()
 
     # Enrich top_packs with pack names
     top_packs_data = []
@@ -515,6 +521,7 @@ def get_analytics():
         "top_packs":       top_packs_data,
         "most_liked":      most_liked_data,
         "daily":           [{"day": r["day"], "count": r["count"]} for r in daily],
+        "daily_downloads": [{"day": r["day"], "count": r["count"]} for r in daily_downloads],
         "daily_likes":     [{"day": r["day"], "count": r["count"]} for r in daily_likes],
     })
 
