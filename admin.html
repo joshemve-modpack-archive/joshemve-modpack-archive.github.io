@@ -1540,8 +1540,8 @@ async function savePack() {
     await loadPacks();
     renderPackTable();
     renderDashboard();
-    showToast(editId ? '✓ Pack updated!' : '✓ Pack added!');
-    showView('packs', document.querySelector('.nav-item:nth-child(2)'));
+    editPack(savedPack.id);
+    showToast(editId ? '✓ Pack updated! (stayed in editor)' : '✓ Pack added! (now editing)');
   } catch(e) {
     showToast('Error: ' + e.message, true);
   } finally {
