@@ -1273,7 +1273,7 @@ function addIAFile() {
     const name = decodeURIComponent(url.split('/').pop().split('?')[0]);
     if (!name || !name.includes('.')) { invalid++; continue; }
     if (pendingFiles.some(f => f.url === url) || existingFiles.some(f => f.url === url)) { dupes++; continue; }
-    pendingFiles.push({ name, url, size: 0, label });
+    pendingFiles.push({ name, url, size: 0, label, hidden: false });
     added++;
   }
 
@@ -1295,6 +1295,16 @@ function removeExistingFile(name) {
   renderPackFileList();
 }
 
+function toggleExistingFileHidden(i) {
+  existingFiles[i].hidden = !existingFiles[i].hidden;
+  renderPackFileList();
+}
+
+function togglePendingFileHidden(i) {
+  pendingFiles[i].hidden = !pendingFiles[i].hidden;
+  renderPackFileList();
+}
+
 function renderPackFileList() {
   const list = document.getElementById('packFileList');
   let html   = '';
@@ -1305,6 +1315,7 @@ function renderPackFileList() {
       <div class="file-item-left" style="flex:1;gap:0.5rem;">
         <span class="file-ext">${ext}</span>
         <span class="file-name" style="flex:1;">${f.name}</span>
+        <button class="btn-ghost" type="button" style="padding:0.2rem 0.45rem;font-size:0.62rem;line-height:1.2;white-space:nowrap;" onclick="toggleExistingFileHidden(${i})">${f.hidden ? 'Hidden' : 'Visible'}</button>
         <input type="text" value="${f.label||''}" placeholder="label"
           style="width:110px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;color:var(--text);font-family:'Outfit',sans-serif;outline:none;"
           onchange="existingFiles[${i}].label=this.value">
@@ -1320,6 +1331,7 @@ function renderPackFileList() {
       <div class="file-item-left" style="flex:1;gap:0.5rem;">
         <span class="file-ext">${ext}</span>
         <span class="file-name" style="flex:1;">${f.name}</span>
+        <button class="btn-ghost" type="button" style="padding:0.2rem 0.45rem;font-size:0.62rem;line-height:1.2;white-space:nowrap;" onclick="togglePendingFileHidden(${i})">${f.hidden ? 'Hidden' : 'Visible'}</button>
         <input type="text" value="${f.label||''}" placeholder="label"
           style="width:110px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;color:var(--text);font-family:'Outfit',sans-serif;outline:none;"
           onchange="pendingFiles[${i}].label=this.value">
@@ -1374,7 +1386,7 @@ function editPack(id) {
   document.getElementById('fHidden').checked    = !!p.hidden;
   document.getElementById('fYear').value        = p.year || '';
   pendingFiles = [];
-  existingFiles  = (p.files || []).map(f => ({ name: f.name, url: f.url, size: f.size || 0, label: f.label || "" }));
+  existingFiles  = (p.files || []).map(f => ({ name: f.name, url: f.url, size: f.size || 0, label: f.label || "", hidden: !!f.hidden }));
   galleryImages  = (p.gallery || []).map(g => ({ id: g.id, image: g.image, caption: g.caption || "", pending: false }));
   renderGalleryGrid();
   renderPackFileList();
@@ -1479,17 +1491,21 @@ async function savePack() {
       for (const f of pendingFiles) {
         await apiFetch(`/packs/${savedPack.id}/files/register`, {
           method: 'POST',
-          body: JSON.stringify({ name: f.name, url: f.url, size: 0, mime_type: '', label: f.label || '' }),
+          body: JSON.stringify({ name: f.name, url: f.url, size: 0, mime_type: '', label: f.label || '', hidden: !!f.hidden }),
         });
       }
     }
 
-    // Update labels on existing files
+    // Update labels / hidden state on existing files
     if (editId && existingFiles.length) {
       for (const f of existingFiles) {
         await apiFetch(`/packs/${savedPack.id}/files/${encodeURIComponent(f.name)}/label`, {
           method: 'PATCH',
           body: JSON.stringify({ label: f.label || '' }),
+        });
+        await apiFetch(`/packs/${savedPack.id}/files/${encodeURIComponent(f.name)}/hidden`, {
+          method: 'PATCH',
+          body: JSON.stringify({ hidden: !!f.hidden }),
         });
       }
     }
