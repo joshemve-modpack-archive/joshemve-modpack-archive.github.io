@@ -17,8 +17,8 @@ app = Flask(__name__)
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "thiswork"   # ← change this
-SECRET_KEY     = "your_secret_key_here" # ← set a fixed random string
+ADMIN_PASSWORD = "didyouactuallythinksthiswouldwork" 
+SECRET_KEY     = "your_secret_key_here" 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH       = os.path.join(BASE_DIR, "modpack_archive.db")
