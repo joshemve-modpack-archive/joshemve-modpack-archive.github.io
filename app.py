@@ -56,11 +56,15 @@ def init_db():
                 year         INTEGER,
                 tags         TEXT    DEFAULT '[]',
                 colors       TEXT    DEFAULT '[]',
+                hidden       INTEGER DEFAULT 0,
                 thumb        TEXT,
                 download_url TEXT,
                 created_at   TEXT    DEFAULT (datetime('now'))
             )
         """)
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(packs)").fetchall()]
+        if "hidden" not in cols:
+            conn.execute("ALTER TABLE packs ADD COLUMN hidden INTEGER DEFAULT 0")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS pack_files (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,6 +162,7 @@ def row_to_pack(row, files=None):
     d["packVer"]      = d.pop("pack_ver",      "")
     d["videoUrl"]     = d.pop("video_url",     "")
     d["downloadUrl"]  = d.pop("download_url",  "")
+    d["hidden"]       = bool(d.get("hidden", 0))
     d.pop("created_at", None)
     if files is not None:
         d["files"] = files
@@ -220,11 +225,20 @@ def get_visitor_id():
     ua = request.headers.get("User-Agent") or ""
     return hashlib.sha256((ip + ua).encode()).hexdigest()[:16]
 
+def is_admin_request():
+    token = request.headers.get("X-Admin-Token", "")
+    expiry = active_tokens.get(token)
+    return bool(expiry and datetime.utcnow() <= expiry)
+
 
 @app.route("/api/packs", methods=["GET"])
 def list_packs():
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM packs ORDER BY display_order ASC, id ASC").fetchall()
+        admin_view = is_admin_request()
+        if admin_view:
+            rows = conn.execute("SELECT * FROM packs ORDER BY display_order ASC, id ASC").fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM packs WHERE hidden=0 ORDER BY display_order ASC, id ASC").fetchall()
         result = []
         for row in rows:
             files   = get_pack_files(conn, row["id"])
@@ -253,6 +267,8 @@ def get_pack(pack_id):
         row = conn.execute("SELECT * FROM packs WHERE id=?", (pack_id,)).fetchone()
         if not row:
             abort(404)
+        if row["hidden"] and not is_admin_request():
+            abort(404)
         files   = get_pack_files(conn, pack_id)
     gallery = get_pack_gallery(conn, pack_id)
     p = row_to_pack(row, files)
@@ -268,8 +284,8 @@ def create_pack():
     with get_db() as conn:
         cur = conn.execute("""
             INSERT INTO packs
-              (name, video_url, desc, mc_ver, pack_ver, mods, status, year, tags, colors, thumb, download_url)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+              (name, video_url, desc, mc_ver, pack_ver, mods, status, year, tags, colors, hidden, thumb, download_url)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             d["name"], d.get("videoUrl",""), d.get("desc",""),
             d["mcVer"], d.get("packVer",""),
@@ -278,6 +294,7 @@ def create_pack():
             int(d.get("year", datetime.utcnow().year)),
             json.dumps(d.get("tags",[])),
             json.dumps(d.get("colors",[])),
+            1 if d.get("hidden", False) else 0,
             d.get("thumb", None),
             d.get("downloadUrl", ""),
         ))
@@ -300,7 +317,7 @@ def update_pack(pack_id):
         conn.execute("""
             UPDATE packs SET
                 name=?, video_url=?, desc=?, mc_ver=?, pack_ver=?,
-                mods=?, status=?, year=?, tags=?, colors=?, thumb=?, download_url=?
+                mods=?, status=?, year=?, tags=?, colors=?, hidden=?, thumb=?, download_url=?
             WHERE id=?
         """, (
             d.get("name"), d.get("videoUrl",""), d.get("desc",""),
@@ -310,6 +327,7 @@ def update_pack(pack_id):
             int(d.get("year", datetime.utcnow().year)),
             json.dumps(d.get("tags",[])),
             json.dumps(d.get("colors",[])),
+            1 if d.get("hidden", False) else 0,
             d.get("thumb", None),
             d.get("downloadUrl", ""),
             pack_id,
