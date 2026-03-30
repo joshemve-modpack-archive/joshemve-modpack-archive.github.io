@@ -906,6 +906,14 @@
                 <option value="paused">Paused</option>
               </select>
             </div>
+            <!-- Visibility -->
+            <div class="form-group">
+              <label class="form-label">Visibility</label>
+              <label style="display:flex;align-items:center;gap:0.55rem;font-size:0.82rem;color:var(--text);margin-top:0.4rem;">
+                <input id="fHidden" type="checkbox" style="width:14px;height:14px;accent-color:var(--accent);">
+                Hide this pack on public pages
+              </label>
+            </div>
             <!-- Year -->
             <div class="form-group">
               <label class="form-label">Year</label>
@@ -1148,7 +1156,10 @@ function renderPackTable() {
           <div class="pack-video-text">${p.videoUrl ? '▶ Video linked' : '—'}</div>
         </div>
       </div>
-      <div><span class="badge badge-${p.status}">${p.status}</span></div>
+      <div>
+        <span class="badge badge-${p.status}">${p.status}</span>
+        ${p.hidden ? '<span class="badge" style="margin-left:0.35rem;background:#2b1e1e;color:#ff9696;border-color:#5a2b2b;">hidden</span>' : ''}
+      </div>
       <div class="pack-row-version">MC ${p.mcVer}<br>${p.packVer||''}${p.files?.length ? `<br><span style="color:var(--accent);font-size:0.62rem;">📦 ${p.files.length} file${p.files.length>1?'s':''}</span>` : ''}</div>
       <div class="row-actions">
         <button class="action-btn feat ${p.id === featuredPackId ? 'feat-active' : ''}" onclick="setFeatured(${p.id})" title="Set as featured">★</button>
@@ -1262,7 +1273,7 @@ function addIAFile() {
     const name = decodeURIComponent(url.split('/').pop().split('?')[0]);
     if (!name || !name.includes('.')) { invalid++; continue; }
     if (pendingFiles.some(f => f.url === url) || existingFiles.some(f => f.url === url)) { dupes++; continue; }
-    pendingFiles.push({ name, url, size: 0, label });
+    pendingFiles.push({ name, url, size: 0, label, hidden: false });
     added++;
   }
 
@@ -1284,6 +1295,16 @@ function removeExistingFile(name) {
   renderPackFileList();
 }
 
+function toggleExistingFileHidden(i) {
+  existingFiles[i].hidden = !existingFiles[i].hidden;
+  renderPackFileList();
+}
+
+function togglePendingFileHidden(i) {
+  pendingFiles[i].hidden = !pendingFiles[i].hidden;
+  renderPackFileList();
+}
+
 function renderPackFileList() {
   const list = document.getElementById('packFileList');
   let html   = '';
@@ -1294,6 +1315,7 @@ function renderPackFileList() {
       <div class="file-item-left" style="flex:1;gap:0.5rem;">
         <span class="file-ext">${ext}</span>
         <span class="file-name" style="flex:1;">${f.name}</span>
+        <button class="btn-ghost" type="button" style="padding:0.2rem 0.45rem;font-size:0.62rem;line-height:1.2;white-space:nowrap;" onclick="toggleExistingFileHidden(${i})">${f.hidden ? 'Hidden' : 'Visible'}</button>
         <input type="text" value="${f.label||''}" placeholder="label"
           style="width:110px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;color:var(--text);font-family:'Outfit',sans-serif;outline:none;"
           onchange="existingFiles[${i}].label=this.value">
@@ -1309,6 +1331,7 @@ function renderPackFileList() {
       <div class="file-item-left" style="flex:1;gap:0.5rem;">
         <span class="file-ext">${ext}</span>
         <span class="file-name" style="flex:1;">${f.name}</span>
+        <button class="btn-ghost" type="button" style="padding:0.2rem 0.45rem;font-size:0.62rem;line-height:1.2;white-space:nowrap;" onclick="togglePendingFileHidden(${i})">${f.hidden ? 'Hidden' : 'Visible'}</button>
         <input type="text" value="${f.label||''}" placeholder="label"
           style="width:110px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;color:var(--text);font-family:'Outfit',sans-serif;outline:none;"
           onchange="pendingFiles[${i}].label=this.value">
@@ -1335,6 +1358,7 @@ function clearForm() {
   document.getElementById('fMods').value = '';
   document.getElementById('fYear').value = new Date().getFullYear();
   document.getElementById('fStatus').value = 'active';
+  document.getElementById('fHidden').checked = false;
   currentTags = []; renderTags();
   selectedColors = ['#1e3a5f','#2563a8','#3b82c4','#1e3a5f'];
   thumbData = null;
@@ -1359,9 +1383,10 @@ function editPack(id) {
   document.getElementById('fPackVer').value     = p.packVer || '';
   document.getElementById('fMods').value        = p.mods || '';
   document.getElementById('fStatus').value      = p.status || 'active';
+  document.getElementById('fHidden').checked    = !!p.hidden;
   document.getElementById('fYear').value        = p.year || '';
   pendingFiles = [];
-  existingFiles  = (p.files || []).map(f => ({ name: f.name, url: f.url, size: f.size || 0, label: f.label || "" }));
+  existingFiles  = (p.files || []).map(f => ({ name: f.name, url: f.url, size: f.size || 0, label: f.label || "", hidden: !!f.hidden }));
   galleryImages  = (p.gallery || []).map(g => ({ id: g.id, image: g.image, caption: g.caption || "", pending: false }));
   renderGalleryGrid();
   renderPackFileList();
@@ -1431,6 +1456,7 @@ async function savePack() {
     packVer:  document.getElementById('fPackVer').value.trim(),
     mods:     parseInt(document.getElementById('fMods').value) || 0,
     status:   document.getElementById('fStatus').value,
+    hidden:   document.getElementById('fHidden').checked,
     year:     parseInt(document.getElementById('fYear').value) || new Date().getFullYear(),
     tags:     [...currentTags],
     colors:   [...selectedColors],
@@ -1465,17 +1491,21 @@ async function savePack() {
       for (const f of pendingFiles) {
         await apiFetch(`/packs/${savedPack.id}/files/register`, {
           method: 'POST',
-          body: JSON.stringify({ name: f.name, url: f.url, size: 0, mime_type: '', label: f.label || '' }),
+          body: JSON.stringify({ name: f.name, url: f.url, size: 0, mime_type: '', label: f.label || '', hidden: !!f.hidden }),
         });
       }
     }
 
-    // Update labels on existing files
+    // Update labels / hidden state on existing files
     if (editId && existingFiles.length) {
       for (const f of existingFiles) {
         await apiFetch(`/packs/${savedPack.id}/files/${encodeURIComponent(f.name)}/label`, {
           method: 'PATCH',
           body: JSON.stringify({ label: f.label || '' }),
+        });
+        await apiFetch(`/packs/${savedPack.id}/files/${encodeURIComponent(f.name)}/hidden`, {
+          method: 'PATCH',
+          body: JSON.stringify({ hidden: !!f.hidden }),
         });
       }
     }
@@ -1510,8 +1540,8 @@ async function savePack() {
     await loadPacks();
     renderPackTable();
     renderDashboard();
-    showToast(editId ? '✓ Pack updated!' : '✓ Pack added!');
-    showView('packs', document.querySelector('.nav-item:nth-child(2)'));
+    editPack(savedPack.id);
+    showToast(editId ? '✓ Pack updated! (stayed in editor)' : '✓ Pack added! (now editing)');
   } catch(e) {
     showToast('Error: ' + e.message, true);
   } finally {

@@ -56,11 +56,15 @@ def init_db():
                 year         INTEGER,
                 tags         TEXT    DEFAULT '[]',
                 colors       TEXT    DEFAULT '[]',
+                hidden       INTEGER DEFAULT 0,
                 thumb        TEXT,
                 download_url TEXT,
                 created_at   TEXT    DEFAULT (datetime('now'))
             )
         """)
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(packs)").fetchall()]
+        if "hidden" not in cols:
+            conn.execute("ALTER TABLE packs ADD COLUMN hidden INTEGER DEFAULT 0")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS pack_files (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,9 +74,13 @@ def init_db():
                 size        INTEGER NOT NULL,
                 mime_type   TEXT,
                 label       TEXT,
+                hidden      INTEGER DEFAULT 0,
                 uploaded_at TEXT    DEFAULT (datetime('now'))
             )
         """)
+        file_cols = [r[1] for r in conn.execute("PRAGMA table_info(pack_files)").fetchall()]
+        if "hidden" not in file_cols:
+            conn.execute("ALTER TABLE pack_files ADD COLUMN hidden INTEGER DEFAULT 0")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS pack_gallery (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,12 +151,18 @@ def get_pack_gallery(conn, pack_id):
     ).fetchall()
     return [{"id": r["id"], "image": r["image_data"], "caption": r["caption"] or ""} for r in rows]
 
-def get_pack_files(conn, pack_id):
-    rows = conn.execute(
-        "SELECT orig_name AS name, size, mime_type, url, label FROM pack_files WHERE pack_id=?",
-        (pack_id,)
-    ).fetchall()
-    return [{"name": r["name"], "size": r["size"], "url": r["url"], "label": r["label"] or ""} for r in rows]
+def get_pack_files(conn, pack_id, include_hidden=False):
+    if include_hidden:
+        rows = conn.execute(
+            "SELECT orig_name AS name, size, mime_type, url, label, hidden FROM pack_files WHERE pack_id=?",
+            (pack_id,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT orig_name AS name, size, mime_type, url, label, hidden FROM pack_files WHERE pack_id=? AND hidden=0",
+            (pack_id,)
+        ).fetchall()
+    return [{"name": r["name"], "size": r["size"], "url": r["url"], "label": r["label"] or "", "hidden": bool(r["hidden"])} for r in rows]
 
 def row_to_pack(row, files=None):
     d = dict(row)
@@ -158,6 +172,7 @@ def row_to_pack(row, files=None):
     d["packVer"]      = d.pop("pack_ver",      "")
     d["videoUrl"]     = d.pop("video_url",     "")
     d["downloadUrl"]  = d.pop("download_url",  "")
+    d["hidden"]       = bool(d.get("hidden", 0))
     d.pop("created_at", None)
     if files is not None:
         d["files"] = files
@@ -220,14 +235,23 @@ def get_visitor_id():
     ua = request.headers.get("User-Agent") or ""
     return hashlib.sha256((ip + ua).encode()).hexdigest()[:16]
 
+def is_admin_request():
+    token = request.headers.get("X-Admin-Token", "")
+    expiry = active_tokens.get(token)
+    return bool(expiry and datetime.utcnow() <= expiry)
+
 
 @app.route("/api/packs", methods=["GET"])
 def list_packs():
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM packs ORDER BY display_order ASC, id ASC").fetchall()
+        admin_view = is_admin_request()
+        if admin_view:
+            rows = conn.execute("SELECT * FROM packs ORDER BY display_order ASC, id ASC").fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM packs WHERE hidden=0 ORDER BY display_order ASC, id ASC").fetchall()
         result = []
         for row in rows:
-            files   = get_pack_files(conn, row["id"])
+            files   = get_pack_files(conn, row["id"], include_hidden=admin_view)
             gallery = get_pack_gallery(conn, row["id"])
             p = row_to_pack(row, files)
             p["gallery"] = gallery
@@ -249,11 +273,14 @@ def reorder_packs():
 
 @app.route("/api/packs/<int:pack_id>", methods=["GET"])
 def get_pack(pack_id):
+    admin_view = is_admin_request()
     with get_db() as conn:
         row = conn.execute("SELECT * FROM packs WHERE id=?", (pack_id,)).fetchone()
         if not row:
             abort(404)
-        files   = get_pack_files(conn, pack_id)
+        if row["hidden"] and not admin_view:
+            abort(404)
+        files   = get_pack_files(conn, pack_id, include_hidden=admin_view)
     gallery = get_pack_gallery(conn, pack_id)
     p = row_to_pack(row, files)
     p["gallery"] = gallery
@@ -268,8 +295,8 @@ def create_pack():
     with get_db() as conn:
         cur = conn.execute("""
             INSERT INTO packs
-              (name, video_url, desc, mc_ver, pack_ver, mods, status, year, tags, colors, thumb, download_url)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+              (name, video_url, desc, mc_ver, pack_ver, mods, status, year, tags, colors, hidden, thumb, download_url)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             d["name"], d.get("videoUrl",""), d.get("desc",""),
             d["mcVer"], d.get("packVer",""),
@@ -278,6 +305,7 @@ def create_pack():
             int(d.get("year", datetime.utcnow().year)),
             json.dumps(d.get("tags",[])),
             json.dumps(d.get("colors",[])),
+            1 if d.get("hidden", False) else 0,
             d.get("thumb", None),
             d.get("downloadUrl", ""),
         ))
@@ -300,7 +328,7 @@ def update_pack(pack_id):
         conn.execute("""
             UPDATE packs SET
                 name=?, video_url=?, desc=?, mc_ver=?, pack_ver=?,
-                mods=?, status=?, year=?, tags=?, colors=?, thumb=?, download_url=?
+                mods=?, status=?, year=?, tags=?, colors=?, hidden=?, thumb=?, download_url=?
             WHERE id=?
         """, (
             d.get("name"), d.get("videoUrl",""), d.get("desc",""),
@@ -310,13 +338,14 @@ def update_pack(pack_id):
             int(d.get("year", datetime.utcnow().year)),
             json.dumps(d.get("tags",[])),
             json.dumps(d.get("colors",[])),
+            1 if d.get("hidden", False) else 0,
             d.get("thumb", None),
             d.get("downloadUrl", ""),
             pack_id,
         ))
         conn.commit()
         row = conn.execute("SELECT * FROM packs WHERE id=?", (pack_id,)).fetchone()
-        files   = get_pack_files(conn, pack_id)
+        files   = get_pack_files(conn, pack_id, include_hidden=True)
         gallery = get_pack_gallery(conn, pack_id)
     p = row_to_pack(row, files)
     p["gallery"] = gallery
@@ -344,12 +373,13 @@ def register_file(pack_id):
         size      = int(d.get("size", 0))
         mime      = d.get("mime_type", "application/octet-stream")
         label     = d.get("label", "") or ""
+        hidden    = 1 if d.get("hidden", False) else 0
         if not orig_name:
             return jsonify({"error": "name required"}), 400
         conn.execute("""
-            INSERT OR REPLACE INTO pack_files (pack_id, url, orig_name, size, mime_type, label)
-            VALUES (?,?,?,?,?,?)
-        """, (pack_id, url, orig_name, size, mime, label))
+            INSERT OR REPLACE INTO pack_files (pack_id, url, orig_name, size, mime_type, label, hidden)
+            VALUES (?,?,?,?,?,?,?)
+        """, (pack_id, url, orig_name, size, mime, label, hidden))
         conn.commit()
     return jsonify({"name": orig_name, "size": size, "url": url}), 201
 
@@ -380,6 +410,22 @@ def update_file_label(pack_id, filename):
         conn.execute(
             "UPDATE pack_files SET label=? WHERE pack_id=? AND orig_name=?",
             (label, pack_id, filename)
+        )
+        conn.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/packs/<int:pack_id>/files/<path:filename>/hidden", methods=["PATCH"])
+@require_admin
+def update_file_hidden(pack_id, filename):
+    """Update hidden state for an existing file."""
+    d      = request.get_json(silent=True) or {}
+    hidden = 1 if d.get("hidden", False) else 0
+    with get_db() as conn:
+        if not conn.execute("SELECT id FROM packs WHERE id=?", (pack_id,)).fetchone():
+            abort(404)
+        conn.execute(
+            "UPDATE pack_files SET hidden=? WHERE pack_id=? AND orig_name=?",
+            (hidden, pack_id, filename)
         )
         conn.commit()
     return jsonify({"ok": True})
