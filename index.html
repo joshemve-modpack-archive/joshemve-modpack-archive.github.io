@@ -822,7 +822,9 @@
 
 <script>
   // ── CONFIG — update this to your PythonAnywhere URL ──────────────────────
-  const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
+  const API_BASES = [
+    'https://joshemvemodpackarchive.pythonanywhere.com/api',
+  ];
   const PACKS_CACHE_KEY = 'jma_packs_cache_v1';
   const PACKS_CACHE_TTL_MS = 1000 * 60 * 15; // 15 minutes
 
@@ -834,12 +836,29 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      console.debug('[JMA] Fetching:', url, `(timeout ${timeoutMs}ms)`);
       const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       return await res.json();
+    } catch (err) {
+      console.error('[JMA] Fetch failed:', url, err);
+      throw err;
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  async function fetchFromAnyApi(path, { timeoutMs = 9000 } = {}) {
+    let lastError = null;
+    for (const base of API_BASES) {
+      const url = `${base}${path}`;
+      try {
+        return await fetchJsonWithTimeout(url, { timeoutMs });
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError || new Error(`All API base URLs failed for ${path}`);
   }
 
   function readPacksCache() {
@@ -890,15 +909,15 @@
 
   async function fetchLikes() {
     try {
-      return await fetchJsonWithTimeout(`${API}/likes`, { timeoutMs: 6000 });
+      return await fetchFromAnyApi('/likes', { timeoutMs: 6000 });
     } catch(e) { return {}; }
   }
 
   async function fetchPacks() {
-    const attempts = [6000, 12000, 20000];
+    const attempts = [6000, 12000, 20000, 30000];
     for (const timeoutMs of attempts) {
       try {
-        return normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs }));
+        return normalizePacks(await fetchFromAnyApi('/packs', { timeoutMs }));
       } catch(e) {
         console.warn(`Packs request failed (timeout ${timeoutMs}ms)`, e);
       }
@@ -908,7 +927,7 @@
 
   async function fetchFeaturedId() {
     try {
-      const data = await fetchJsonWithTimeout(`${API}/settings/featured`, { timeoutMs: 6000 });
+      const data = await fetchFromAnyApi('/settings/featured', { timeoutMs: 6000 });
       return data.featured_id || null;
     } catch(e) { return null; }
   }
@@ -1081,6 +1100,7 @@
 
   // ── INIT ──────────────────────────────────────────────────────────────────
   window.addEventListener('DOMContentLoaded', async () => {
+    console.info('[JMA] API base URLs:', API_BASES);
     // Show loading state
     document.getElementById('cardContainer').innerHTML =
       '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
@@ -1104,6 +1124,12 @@
     renderTagFilters(allPacks);
     renderCards(allPacks);
     renderFeatured(allPacks, featuredData);
+
+    if (!allPacks.length) {
+      console.error('[JMA] No packs available after cache + API attempts.');
+      document.getElementById('cardContainer').innerHTML =
+        '<div style="grid-column:1/-1;padding:2rem;text-align:center;color:#ff6b6b;font-size:0.8rem;font-family:\'Space Mono\',monospace;">// Could not load packs from API. Open browser console for request errors.</div>';
+    }
   });
 </script>
 </body>
