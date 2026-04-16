@@ -895,6 +895,7 @@
   }
 
   async function fetchPacks() {
+    const cached = readPacksCache();
     try {
       return normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 }));
     } catch(e) {
@@ -963,13 +964,14 @@
   }
 
   function renderCards(packs) {
+    const sortedPacks = sortNewestFirst(packs);
     const container = document.getElementById('cardContainer');
-    if (!packs.length) {
+    if (!sortedPacks.length) {
       container.innerHTML = '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.9rem;">No packs found.</div>';
       document.getElementById('countDisplay').textContent = '0 packs';
       return;
     }
-    container.innerHTML = packs.map((p, i) => `
+    container.innerHTML = sortedPacks.map((p, i) => `
       <a class="card" href="pack.html?id=${p.id}" data-tags="${p.status} ${(p.tags||[]).map(t=>t.toLowerCase()).join(' ')}" style="animation-delay:${i*0.06}s;text-decoration:none;color:inherit;">
         <div class="card-header">
           <div class="card-header-bg" style="background:linear-gradient(135deg,${darken(p.colors?.[0]||'#111')} 0%,${darken(p.colors?.[1]||'#222')} 100%);"></div>
@@ -989,7 +991,7 @@
           </div>
         </div>
       </a>`).join('');
-    document.getElementById('countDisplay').textContent = `${packs.length} packs`;
+    document.getElementById('countDisplay').textContent = `${sortedPacks.length} packs`;
     attachHoverEffects();
   }
 
