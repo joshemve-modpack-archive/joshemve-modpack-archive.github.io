@@ -213,8 +213,8 @@ def get_pack_files_map(conn, pack_ids, include_hidden=False):
 
 def row_to_pack(row, files=None):
     d = dict(row)
-    d["tags"]         = json.loads(d.get("tags")    or "[]")
-    d["colors"]       = json.loads(d.get("colors")  or "[]")
+    d["tags"]         = parse_json_list(d.get("tags"))
+    d["colors"]       = parse_json_list(d.get("colors"))
     d["mcVer"]        = d.pop("mc_ver",        "")
     d["packVer"]      = d.pop("pack_ver",      "")
     d["videoUrl"]     = d.pop("video_url",     "")
@@ -224,6 +224,30 @@ def row_to_pack(row, files=None):
     if files is not None:
         d["files"] = files
     return d
+
+
+def parse_json_list(raw_value):
+    """Safely parse list-like JSON DB fields.
+
+    Prevents a single malformed row from crashing /api/packs.
+    """
+    if raw_value is None:
+        return []
+    if isinstance(raw_value, list):
+        return raw_value
+
+    text = str(raw_value).strip()
+    if not text:
+        return []
+
+    try:
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, list) else []
+    except json.JSONDecodeError:
+        # Backward-compat fallback for old comma-separated values.
+        if "," in text:
+            return [part.strip() for part in text.split(",") if part.strip()]
+        return [text]
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
 def require_admin(f):
