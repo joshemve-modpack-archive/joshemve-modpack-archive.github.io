@@ -823,35 +823,92 @@
 <script>
   // ── CONFIG — update this to your PythonAnywhere URL ──────────────────────
   const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
+  const PACKS_CACHE_KEY = 'jma_packs_cache_v1';
+  const PACKS_CACHE_TTL_MS = 1000 * 60 * 15; // 15 minutes
 
   // ── API HELPERS ───────────────────────────────────────────────────────────
   let allPacks = [];
   let allLikes = {};
 
-  async function fetchLikes() {
+  async function fetchJsonWithTimeout(url, { timeoutMs = 9000 } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(`${API}/likes`);
-      if (!res.ok) return {};
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       return await res.json();
-    } catch(e) { return {}; }
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  async function fetchPacks() {
+  function readPacksCache() {
     try {
-      const res = await fetch(`${API}/packs`);
-      if (!res.ok) throw new Error('API error');
-      return await res.json();
-    } catch(e) {
-      console.warn('API unavailable, using empty list', e);
+      const raw = localStorage.getItem(PACKS_CACHE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!parsed?.savedAt || !Array.isArray(parsed.packs)) return [];
+      if ((Date.now() - parsed.savedAt) > PACKS_CACHE_TTL_MS) return [];
+      return parsed.packs;
+    } catch (e) {
       return [];
     }
   }
 
+  function writePacksCache(packs) {
+    try {
+      localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), packs }));
+    } catch (e) {}
+  }
+
+  function normalizePacks(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.packs)) return payload.packs;
+    return [];
+  }
+
+  function mergePacks(basePacks, incomingPacks) {
+    const base = Array.isArray(basePacks) ? basePacks : [];
+    const incoming = Array.isArray(incomingPacks) ? incomingPacks : [];
+    const baseById = new Map();
+    base.forEach(p => {
+      if (p?.id != null) baseById.set(String(p.id), p);
+    });
+
+    const mergedInIncomingOrder = [];
+    const seen = new Set();
+    incoming.forEach(p => {
+      if (p?.id == null) return;
+      const id = String(p.id);
+      seen.add(id);
+      mergedInIncomingOrder.push({ ...(baseById.get(id) || {}), ...p });
+    });
+
+    const cacheOnly = base.filter(p => p?.id != null && !seen.has(String(p.id)));
+    return [...mergedInIncomingOrder, ...cacheOnly];
+  }
+
+  async function fetchLikes() {
+    try {
+      return await fetchJsonWithTimeout(`${API}/likes`, { timeoutMs: 6000 });
+    } catch(e) { return {}; }
+  }
+
+  async function fetchPacks() {
+    const attempts = [6000, 12000, 20000];
+    for (const timeoutMs of attempts) {
+      try {
+        return normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs }));
+      } catch(e) {
+        console.warn(`Packs request failed (timeout ${timeoutMs}ms)`, e);
+      }
+    }
+    return [];
+  }
+
   async function fetchFeaturedId() {
     try {
-      const res = await fetch(`${API}/settings/featured`);
-      if (!res.ok) return null;
-      const data = await res.json();
+      const data = await fetchJsonWithTimeout(`${API}/settings/featured`, { timeoutMs: 6000 });
       return data.featured_id || null;
     } catch(e) { return null; }
   }
@@ -1027,11 +1084,23 @@
     document.getElementById('cardContainer').innerHTML =
       '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
 
-    const [packs, featuredData, likesData] = await Promise.all([fetchPacks(), fetchFeaturedId(), fetchLikes()]);
-    allLikes = likesData;
-    allPacks = packs;
-    document.getElementById('heroPackCount').textContent = packs.length;
-    renderTagFilters(packs);
+    const cachedPacks = normalizePacks(readPacksCache());
+    if (cachedPacks.length) {
+      allPacks = cachedPacks;
+      document.getElementById('heroPackCount').textContent = cachedPacks.length;
+      renderTagFilters(cachedPacks);
+      renderCards(cachedPacks);
+    }
+
+    const [packsRes, featuredRes, likesRes] = await Promise.allSettled([fetchPacks(), fetchFeaturedId(), fetchLikes()]);
+    const serverPacks = packsRes.status === 'fulfilled' ? normalizePacks(packsRes.value) : [];
+    const featuredData = featuredRes.status === 'fulfilled' ? featuredRes.value : null;
+    allLikes = likesRes.status === 'fulfilled' ? (likesRes.value || {}) : {};
+
+    allPacks = mergePacks(cachedPacks, serverPacks);
+    if (allPacks.length) writePacksCache(allPacks);
+    document.getElementById('heroPackCount').textContent = allPacks.length;
+    renderTagFilters(allPacks);
     renderCards(allPacks);
     renderFeatured(allPacks, featuredData);
   });
