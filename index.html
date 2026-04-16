@@ -994,7 +994,7 @@
   }
 
   function renderCards(packs) {
-    const sortedPacks = sortNewestFirst(packs);
+    const sortedPacks = Array.isArray(packs) ? packs : [];
     const container = document.getElementById('cardContainer');
     if (!sortedPacks.length) {
       container.innerHTML = '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.9rem;">No packs found.</div>';
