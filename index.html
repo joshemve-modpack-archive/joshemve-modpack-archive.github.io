@@ -868,19 +868,24 @@
   }
 
   function mergePacks(basePacks, incomingPacks) {
-    const map = new Map();
-    (Array.isArray(basePacks) ? basePacks : []).forEach(p => {
-      if (p?.id != null) map.set(String(p.id), p);
+    const base = Array.isArray(basePacks) ? basePacks : [];
+    const incoming = Array.isArray(incomingPacks) ? incomingPacks : [];
+    const baseById = new Map();
+    base.forEach(p => {
+      if (p?.id != null) baseById.set(String(p.id), p);
     });
-    (Array.isArray(incomingPacks) ? incomingPacks : []).forEach(p => {
-      if (p?.id != null) map.set(String(p.id), { ...(map.get(String(p.id)) || {}), ...p });
-    });
-    return [...map.values()].sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
-  }
 
-  function sortNewestFirst(packs) {
-    return [...(Array.isArray(packs) ? packs : [])]
-      .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
+    const mergedInIncomingOrder = [];
+    const seen = new Set();
+    incoming.forEach(p => {
+      if (p?.id == null) return;
+      const id = String(p.id);
+      seen.add(id);
+      mergedInIncomingOrder.push({ ...(baseById.get(id) || {}), ...p });
+    });
+
+    const cacheOnly = base.filter(p => p?.id != null && !seen.has(String(p.id)));
+    return [...mergedInIncomingOrder, ...cacheOnly];
   }
 
   async function fetchLikes() {
