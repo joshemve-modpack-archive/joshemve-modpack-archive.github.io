@@ -984,6 +984,15 @@
     </div>`;
   }
 
+  function sortNewestFirst(packs) {
+    const copy = Array.isArray(packs) ? [...packs] : [];
+    return copy.sort((a, b) => {
+      const aId = Number(a?.id ?? 0);
+      const bId = Number(b?.id ?? 0);
+      return bId - aId;
+    });
+  }
+
   function renderCards(packs) {
     const sortedPacks = sortNewestFirst(packs);
     const container = document.getElementById('cardContainer');
