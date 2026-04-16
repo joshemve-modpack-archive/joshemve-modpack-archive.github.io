@@ -706,6 +706,19 @@
     }
   }
 
+  async function fetchWithRetries(url, { timeouts = [6000, 12000, 20000], options = {} } = {}) {
+    let lastError = null;
+    for (const timeoutMs of timeouts) {
+      try {
+        return await fetchJsonWithTimeout(url, { timeoutMs, options });
+      } catch (e) {
+        lastError = e;
+        console.warn(`Request failed for ${url} (timeout ${timeoutMs}ms)`, e);
+      }
+    }
+    throw lastError || new Error(`Request failed for ${url}`);
+  }
+
   function readPacksCache() {
     try {
       const raw = localStorage.getItem(PACKS_CACHE_KEY);
@@ -1136,11 +1149,11 @@
     }
 
     try {
-      const pack = await fetchJsonWithTimeout(`${API}/packs/${id}`, { timeoutMs: 9000 });
+      const pack = await fetchWithRetries(`${API}/packs/${id}`);
 
       let allPacks = [];
       try {
-        allPacks = normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 }));
+        allPacks = normalizePacks(await fetchWithRetries(`${API}/packs`));
         if (Array.isArray(allPacks) && allPacks.length) writePacksCache(allPacks);
       } catch (e) {
         allPacks = normalizePacks(readPacksCache());

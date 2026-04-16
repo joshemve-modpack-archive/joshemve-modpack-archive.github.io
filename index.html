@@ -895,13 +895,15 @@
   }
 
   async function fetchPacks() {
-    const cached = readPacksCache();
-    try {
-      return normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 }));
-    } catch(e) {
-      console.warn('API unavailable while fetching packs', e);
-      return [];
+    const attempts = [6000, 12000, 20000];
+    for (const timeoutMs of attempts) {
+      try {
+        return normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs }));
+      } catch(e) {
+        console.warn(`Packs request failed (timeout ${timeoutMs}ms)`, e);
+      }
     }
+    return [];
   }
 
   async function fetchFeaturedId() {
