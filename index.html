@@ -861,6 +861,23 @@
     } catch (e) {}
   }
 
+  function normalizePacks(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.packs)) return payload.packs;
+    return [];
+  }
+
+  function mergePacks(basePacks, incomingPacks) {
+    const map = new Map();
+    (Array.isArray(basePacks) ? basePacks : []).forEach(p => {
+      if (p?.id != null) map.set(String(p.id), p);
+    });
+    (Array.isArray(incomingPacks) ? incomingPacks : []).forEach(p => {
+      if (p?.id != null) map.set(String(p.id), { ...(map.get(String(p.id)) || {}), ...p });
+    });
+    return [...map.values()].sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+  }
+
   async function fetchLikes() {
     try {
       return await fetchJsonWithTimeout(`${API}/likes`, { timeoutMs: 6000 });
@@ -870,12 +887,10 @@
   async function fetchPacks() {
     const cached = readPacksCache();
     try {
-      const packs = await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 });
-      if (Array.isArray(packs) && packs.length) writePacksCache(packs);
-      return packs;
+      return normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 }));
     } catch(e) {
-      console.warn('API unavailable, using cached packs if available', e);
-      return cached;
+      console.warn('API unavailable while fetching packs', e);
+      return [];
     }
   }
 
@@ -1057,15 +1072,23 @@
     document.getElementById('cardContainer').innerHTML =
       '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
 
-    const [packsRes, featuredRes, likesRes] = await Promise.allSettled([fetchPacks(), fetchFeaturedId(), fetchLikes()]);
-    const packs = packsRes.status === 'fulfilled' ? packsRes.value : [];
-    const featuredData = featuredRes.status === 'fulfilled' ? featuredRes.value : null;
-    const likesData = likesRes.status === 'fulfilled' ? likesRes.value : {};
+    const cachedPacks = normalizePacks(readPacksCache());
+    if (cachedPacks.length) {
+      allPacks = cachedPacks;
+      document.getElementById('heroPackCount').textContent = cachedPacks.length;
+      renderTagFilters(cachedPacks);
+      renderCards(cachedPacks);
+    }
 
-    allLikes = likesData || {};
-    allPacks = Array.isArray(packs) ? packs : [];
-    document.getElementById('heroPackCount').textContent = packs.length;
-    renderTagFilters(packs);
+    const [packsRes, featuredRes, likesRes] = await Promise.allSettled([fetchPacks(), fetchFeaturedId(), fetchLikes()]);
+    const serverPacks = packsRes.status === 'fulfilled' ? normalizePacks(packsRes.value) : [];
+    const featuredData = featuredRes.status === 'fulfilled' ? featuredRes.value : null;
+    allLikes = likesRes.status === 'fulfilled' ? (likesRes.value || {}) : {};
+
+    allPacks = mergePacks(cachedPacks, serverPacks);
+    if (allPacks.length) writePacksCache(allPacks);
+    document.getElementById('heroPackCount').textContent = allPacks.length;
+    renderTagFilters(allPacks);
     renderCards(allPacks);
     renderFeatured(allPacks, featuredData);
   });

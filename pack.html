@@ -725,6 +725,17 @@
     } catch (e) {}
   }
 
+  function normalizePacks(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.packs)) return payload.packs;
+    return [];
+  }
+
+  function findPackInCache(packId) {
+    const cached = normalizePacks(readPacksCache());
+    return cached.find(p => String(p.id) === String(packId)) || null;
+  }
+
   function track(type, data={}) {
     fetch(`${API}/track`, {
       method: 'POST',
@@ -1117,15 +1128,29 @@
 
     renderLoading();
 
+    const cachedPack = findPackInCache(id);
+    if (cachedPack) {
+      currentPackId = cachedPack.id;
+      renderPack(cachedPack, normalizePacks(readPacksCache()));
+      loadLikes(cachedPack.id);
+    }
+
     try {
       const pack = await fetchJsonWithTimeout(`${API}/packs/${id}`, { timeoutMs: 9000 });
 
       let allPacks = [];
       try {
-        allPacks = await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 });
+        allPacks = normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 }));
         if (Array.isArray(allPacks) && allPacks.length) writePacksCache(allPacks);
       } catch (e) {
-        allPacks = readPacksCache();
+        allPacks = normalizePacks(readPacksCache());
+      }
+
+      if (pack?.id != null) {
+        const idx = allPacks.findIndex(p => String(p.id) === String(pack.id));
+        if (idx >= 0) allPacks[idx] = { ...allPacks[idx], ...pack };
+        else allPacks.unshift(pack);
+        writePacksCache(allPacks);
       }
 
       currentPackId = pack.id;
@@ -1142,7 +1167,7 @@
         }
       });
     } catch (e) {
-      renderError('Pack not found or failed to load.');
+      if (!cachedPack) renderError('Pack not found or failed to load.');
     }
   }
 
