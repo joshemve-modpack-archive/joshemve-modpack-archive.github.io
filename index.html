@@ -885,6 +885,7 @@
   }
 
   async function fetchPacks() {
+    const cached = readPacksCache();
     try {
       return normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 }));
     } catch(e) {
