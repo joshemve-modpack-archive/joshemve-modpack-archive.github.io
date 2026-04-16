@@ -823,35 +823,84 @@
 <script>
   // ── CONFIG — update this to your PythonAnywhere URL ──────────────────────
   const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
+  const PACKS_CACHE_KEY = 'jma_packs_cache_v1';
+  const PACKS_CACHE_TTL_MS = 1000 * 60 * 15; // 15 minutes
 
   // ── API HELPERS ───────────────────────────────────────────────────────────
   let allPacks = [];
   let allLikes = {};
 
+  async function fetchJsonWithTimeout(url, { timeoutMs = 9000 } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function readPacksCache() {
+    try {
+      const raw = localStorage.getItem(PACKS_CACHE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!parsed?.savedAt || !Array.isArray(parsed.packs)) return [];
+      if ((Date.now() - parsed.savedAt) > PACKS_CACHE_TTL_MS) return [];
+      return parsed.packs;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function writePacksCache(packs) {
+    try {
+      localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), packs }));
+    } catch (e) {}
+  }
+
+  function normalizePacks(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.packs)) return payload.packs;
+    return [];
+  }
+
+  function mergePacks(basePacks, incomingPacks) {
+    const map = new Map();
+    (Array.isArray(basePacks) ? basePacks : []).forEach(p => {
+      if (p?.id != null) map.set(String(p.id), p);
+    });
+    (Array.isArray(incomingPacks) ? incomingPacks : []).forEach(p => {
+      if (p?.id != null) map.set(String(p.id), { ...(map.get(String(p.id)) || {}), ...p });
+    });
+    return [...map.values()].sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+  }
+
+  function sortNewestFirst(packs) {
+    return [...(Array.isArray(packs) ? packs : [])]
+      .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
+  }
+
   async function fetchLikes() {
     try {
-      const res = await fetch(`${API}/likes`);
-      if (!res.ok) return {};
-      return await res.json();
+      return await fetchJsonWithTimeout(`${API}/likes`, { timeoutMs: 6000 });
     } catch(e) { return {}; }
   }
 
   async function fetchPacks() {
     try {
-      const res = await fetch(`${API}/packs`);
-      if (!res.ok) throw new Error('API error');
-      return await res.json();
+      return normalizePacks(await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 }));
     } catch(e) {
-      console.warn('API unavailable, using empty list', e);
+      console.warn('API unavailable while fetching packs', e);
       return [];
     }
   }
 
   async function fetchFeaturedId() {
     try {
-      const res = await fetch(`${API}/settings/featured`);
-      if (!res.ok) return null;
-      const data = await res.json();
+      const data = await fetchJsonWithTimeout(`${API}/settings/featured`, { timeoutMs: 6000 });
       return data.featured_id || null;
     } catch(e) { return null; }
   }
@@ -909,13 +958,14 @@
   }
 
   function renderCards(packs) {
+    const sortedPacks = sortNewestFirst(packs);
     const container = document.getElementById('cardContainer');
-    if (!packs.length) {
+    if (!sortedPacks.length) {
       container.innerHTML = '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.9rem;">No packs found.</div>';
       document.getElementById('countDisplay').textContent = '0 packs';
       return;
     }
-    container.innerHTML = packs.map((p, i) => `
+    container.innerHTML = sortedPacks.map((p, i) => `
       <a class="card" href="pack.html?id=${p.id}" data-tags="${p.status} ${(p.tags||[]).map(t=>t.toLowerCase()).join(' ')}" style="animation-delay:${i*0.06}s;text-decoration:none;color:inherit;">
         <div class="card-header">
           <div class="card-header-bg" style="background:linear-gradient(135deg,${darken(p.colors?.[0]||'#111')} 0%,${darken(p.colors?.[1]||'#222')} 100%);"></div>
@@ -935,7 +985,7 @@
           </div>
         </div>
       </a>`).join('');
-    document.getElementById('countDisplay').textContent = `${packs.length} packs`;
+    document.getElementById('countDisplay').textContent = `${sortedPacks.length} packs`;
     attachHoverEffects();
   }
 
@@ -1027,11 +1077,23 @@
     document.getElementById('cardContainer').innerHTML =
       '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
 
-    const [packs, featuredData, likesData] = await Promise.all([fetchPacks(), fetchFeaturedId(), fetchLikes()]);
-    allLikes = likesData;
-    allPacks = packs;
-    document.getElementById('heroPackCount').textContent = packs.length;
-    renderTagFilters(packs);
+    const cachedPacks = normalizePacks(readPacksCache());
+    if (cachedPacks.length) {
+      allPacks = cachedPacks;
+      document.getElementById('heroPackCount').textContent = cachedPacks.length;
+      renderTagFilters(cachedPacks);
+      renderCards(cachedPacks);
+    }
+
+    const [packsRes, featuredRes, likesRes] = await Promise.allSettled([fetchPacks(), fetchFeaturedId(), fetchLikes()]);
+    const serverPacks = packsRes.status === 'fulfilled' ? normalizePacks(packsRes.value) : [];
+    const featuredData = featuredRes.status === 'fulfilled' ? featuredRes.value : null;
+    allLikes = likesRes.status === 'fulfilled' ? (likesRes.value || {}) : {};
+
+    allPacks = mergePacks(cachedPacks, serverPacks);
+    if (allPacks.length) writePacksCache(allPacks);
+    document.getElementById('heroPackCount').textContent = allPacks.length;
+    renderTagFilters(allPacks);
     renderCards(allPacks);
     renderFeatured(allPacks, featuredData);
   });
