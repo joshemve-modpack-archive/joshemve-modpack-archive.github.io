@@ -1087,7 +1087,7 @@ let featuredPackId = null;
 async function loadPacks() {
   try {
     const [packs, featuredData] = await Promise.all([
-      apiFetch('/packs'),
+      apiFetch('/packs?include_files=1&include_gallery=1'),
       apiFetch('/settings/featured').catch(() => ({ featured_id: null }))
     ]);
     packsCache     = packs;

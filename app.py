@@ -151,6 +151,28 @@ def get_pack_gallery(conn, pack_id):
     ).fetchall()
     return [{"id": r["id"], "image": r["image_data"], "caption": r["caption"] or ""} for r in rows]
 
+def get_pack_gallery_map(conn, pack_ids):
+    if not pack_ids:
+        return {}
+    placeholders = ",".join("?" for _ in pack_ids)
+    rows = conn.execute(
+        f"""
+        SELECT id, pack_id, image_data, caption, sort_order
+        FROM pack_gallery
+        WHERE pack_id IN ({placeholders})
+        ORDER BY pack_id ASC, sort_order ASC
+        """,
+        tuple(pack_ids)
+    ).fetchall()
+    result = {pid: [] for pid in pack_ids}
+    for r in rows:
+        result[r["pack_id"]].append({
+            "id": r["id"],
+            "image": r["image_data"],
+            "caption": r["caption"] or ""
+        })
+    return result
+
 def get_pack_files(conn, pack_id, include_hidden=False):
     if include_hidden:
         rows = conn.execute(
@@ -163,6 +185,31 @@ def get_pack_files(conn, pack_id, include_hidden=False):
             (pack_id,)
         ).fetchall()
     return [{"name": r["name"], "size": r["size"], "url": r["url"], "label": r["label"] or "", "hidden": bool(r["hidden"])} for r in rows]
+
+def get_pack_files_map(conn, pack_ids, include_hidden=False):
+    if not pack_ids:
+        return {}
+    placeholders = ",".join("?" for _ in pack_ids)
+    query = f"""
+        SELECT pack_id, orig_name AS name, size, mime_type, url, label, hidden
+        FROM pack_files
+        WHERE pack_id IN ({placeholders})
+    """
+    params = list(pack_ids)
+    if not include_hidden:
+        query += " AND hidden=0"
+    query += " ORDER BY pack_id ASC, id ASC"
+    rows = conn.execute(query, tuple(params)).fetchall()
+    result = {pid: [] for pid in pack_ids}
+    for r in rows:
+        result[r["pack_id"]].append({
+            "name": r["name"],
+            "size": r["size"],
+            "url": r["url"],
+            "label": r["label"] or "",
+            "hidden": bool(r["hidden"])
+        })
+    return result
 
 def row_to_pack(row, files=None):
     d = dict(row)
@@ -245,16 +292,27 @@ def is_admin_request():
 def list_packs():
     with get_db() as conn:
         admin_view = is_admin_request()
+        include_files = request.args.get("include_files")
+        include_gallery = request.args.get("include_gallery")
+        include_files = admin_view if include_files is None else include_files.lower() in ("1", "true", "yes")
+        include_gallery = admin_view if include_gallery is None else include_gallery.lower() in ("1", "true", "yes")
+
         if admin_view:
             rows = conn.execute("SELECT * FROM packs ORDER BY display_order ASC, id ASC").fetchall()
         else:
             rows = conn.execute("SELECT * FROM packs WHERE hidden=0 ORDER BY display_order ASC, id ASC").fetchall()
+
+        pack_ids = [row["id"] for row in rows]
+        files_map = get_pack_files_map(conn, pack_ids, include_hidden=admin_view) if include_files else {}
+        gallery_map = get_pack_gallery_map(conn, pack_ids) if include_gallery else {}
+
         result = []
         for row in rows:
-            files   = get_pack_files(conn, row["id"], include_hidden=admin_view)
-            gallery = get_pack_gallery(conn, row["id"])
+            pack_id = row["id"]
+            files = files_map.get(pack_id) if include_files else None
             p = row_to_pack(row, files)
-            p["gallery"] = gallery
+            if include_gallery:
+                p["gallery"] = gallery_map.get(pack_id, [])
             result.append(p)
     return jsonify(result)
 
