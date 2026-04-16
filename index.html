@@ -823,35 +823,65 @@
 <script>
   // ── CONFIG — update this to your PythonAnywhere URL ──────────────────────
   const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
+  const PACKS_CACHE_KEY = 'jma_packs_cache_v1';
+  const PACKS_CACHE_TTL_MS = 1000 * 60 * 15; // 15 minutes
 
   // ── API HELPERS ───────────────────────────────────────────────────────────
   let allPacks = [];
   let allLikes = {};
 
+  async function fetchJsonWithTimeout(url, { timeoutMs = 9000 } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function readPacksCache() {
+    try {
+      const raw = localStorage.getItem(PACKS_CACHE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!parsed?.savedAt || !Array.isArray(parsed.packs)) return [];
+      if ((Date.now() - parsed.savedAt) > PACKS_CACHE_TTL_MS) return [];
+      return parsed.packs;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function writePacksCache(packs) {
+    try {
+      localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), packs }));
+    } catch (e) {}
+  }
+
   async function fetchLikes() {
     try {
-      const res = await fetch(`${API}/likes`);
-      if (!res.ok) return {};
-      return await res.json();
+      return await fetchJsonWithTimeout(`${API}/likes`, { timeoutMs: 6000 });
     } catch(e) { return {}; }
   }
 
   async function fetchPacks() {
+    const cached = readPacksCache();
     try {
-      const res = await fetch(`${API}/packs`);
-      if (!res.ok) throw new Error('API error');
-      return await res.json();
+      const packs = await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 });
+      if (Array.isArray(packs) && packs.length) writePacksCache(packs);
+      return packs;
     } catch(e) {
-      console.warn('API unavailable, using empty list', e);
-      return [];
+      console.warn('API unavailable, using cached packs if available', e);
+      return cached;
     }
   }
 
   async function fetchFeaturedId() {
     try {
-      const res = await fetch(`${API}/settings/featured`);
-      if (!res.ok) return null;
-      const data = await res.json();
+      const data = await fetchJsonWithTimeout(`${API}/settings/featured`, { timeoutMs: 6000 });
       return data.featured_id || null;
     } catch(e) { return null; }
   }
@@ -1027,9 +1057,13 @@
     document.getElementById('cardContainer').innerHTML =
       '<div style="grid-column:1/-1;padding:4rem;text-align:center;color:#4a4f5e;font-size:0.85rem;font-family:\'Space Mono\',monospace;">// Loading packs...</div>';
 
-    const [packs, featuredData, likesData] = await Promise.all([fetchPacks(), fetchFeaturedId(), fetchLikes()]);
-    allLikes = likesData;
-    allPacks = packs;
+    const [packsRes, featuredRes, likesRes] = await Promise.allSettled([fetchPacks(), fetchFeaturedId(), fetchLikes()]);
+    const packs = packsRes.status === 'fulfilled' ? packsRes.value : [];
+    const featuredData = featuredRes.status === 'fulfilled' ? featuredRes.value : null;
+    const likesData = likesRes.status === 'fulfilled' ? likesRes.value : {};
+
+    allLikes = likesData || {};
+    allPacks = Array.isArray(packs) ? packs : [];
     document.getElementById('heroPackCount').textContent = packs.length;
     renderTagFilters(packs);
     renderCards(allPacks);
