@@ -691,6 +691,39 @@
 
 <script>
   const API = 'https://joshemvemodpackarchive.pythonanywhere.com/api';
+  const PACKS_CACHE_KEY = 'jma_packs_cache_v1';
+  const PACKS_CACHE_TTL_MS = 1000 * 60 * 15; // 15 minutes
+
+  async function fetchJsonWithTimeout(url, { timeoutMs = 9000, options = {} } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function readPacksCache() {
+    try {
+      const raw = localStorage.getItem(PACKS_CACHE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!parsed?.savedAt || !Array.isArray(parsed.packs)) return [];
+      if ((Date.now() - parsed.savedAt) > PACKS_CACHE_TTL_MS) return [];
+      return parsed.packs;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function writePacksCache(packs) {
+    try {
+      localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), packs }));
+    } catch (e) {}
+  }
 
   function track(type, data={}) {
     fetch(`${API}/track`, {
@@ -1010,8 +1043,7 @@
 
   async function loadLikes(packId) {
     try {
-      const res = await fetch(`${API}/packs/${packId}/like`);
-      const data = await res.json();
+      const data = await fetchJsonWithTimeout(`${API}/packs/${packId}/like`, { timeoutMs: 6000 });
       updateLikeUI(data.liked, data.count);
     } catch(e) {}
   }
@@ -1021,8 +1053,10 @@
     const btn = document.getElementById('likeBtn');
     btn.disabled = true;
     try {
-      const res = await fetch(`${API}/packs/${currentPackId}/like`, { method: 'POST' });
-      const data = await res.json();
+      const data = await fetchJsonWithTimeout(`${API}/packs/${currentPackId}/like`, {
+        timeoutMs: 6000,
+        options: { method: 'POST' }
+      });
       updateLikeUI(data.liked, data.count);
     } catch(e) {}
     btn.disabled = false;
@@ -1084,13 +1118,16 @@
     renderLoading();
 
     try {
-      const [res, allRes] = await Promise.all([
-        fetch(`${API}/packs/${id}`),
-        fetch(`${API}/packs`)
-      ]);
-      if (!res.ok) throw new Error('Pack not found');
-      const pack    = await res.json();
-      const allPacks = allRes.ok ? await allRes.json() : [];
+      const pack = await fetchJsonWithTimeout(`${API}/packs/${id}`, { timeoutMs: 9000 });
+
+      let allPacks = [];
+      try {
+        allPacks = await fetchJsonWithTimeout(`${API}/packs`, { timeoutMs: 9000 });
+        if (Array.isArray(allPacks) && allPacks.length) writePacksCache(allPacks);
+      } catch (e) {
+        allPacks = readPacksCache();
+      }
+
       currentPackId = pack.id;
       renderPack(pack, allPacks);
       loadLikes(pack.id);
